@@ -1,0 +1,56 @@
+﻿# ============================================================
+# FloodGuard AI Platform - Prometheus Scrape Configuration
+# Step 5: Integration & Scaling — Monitoring & Observability
+# ============================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    platform: "floodguard"
+    environment: "production"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files:
+  - "floodguard_alerts.yml"
+
+scrape_configs:
+  # FloodGuard FastAPI - Main API
+  - job_name: "floodguard-api"
+    static_configs:
+      - targets: ["floodguard:8000"]
+    metrics_path: "/metrics"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: "([^:]+):.*"
+        replacement: "${1}"
+
+  # FloodGuard Ingestion Engine
+  - job_name: "floodguard-ingestion"
+    static_configs:
+      - targets: ["floodguard-ingestion:8001"]
+    metrics_path: "/metrics"
+
+  # FloodGuard Forecast Engine
+  - job_name: "floodguard-forecast"
+    static_configs:
+      - targets: ["floodguard-forecast:8002"]
+    metrics_path: "/metrics"
+
+  # FloodGuard Alert Dispatcher
+  - job_name: "floodguard-alerts"
+    static_configs:
+      - targets: ["floodguard-alerts:8003"]
+    metrics_path: "/metrics"
+
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

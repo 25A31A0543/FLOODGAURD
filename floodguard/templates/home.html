@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloodGuard — Smart Early Warning Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Three.js for Mini 3D Terrain & Waterflow Preview Widget -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(160deg, #02459b 0%, #0666c5 35%, #0284c7 65%, #024a8e 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .bg-halo {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(56,189,248,.18) 0%, transparent 55%),
+        radial-gradient(circle at 80% 80%, rgba(14,165,233,.14) 0%, transparent 55%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.06) 0%, transparent 70%);
+    }
+    .wave {
+      position: fixed; bottom: -120px; width: 150%; height: 420px;
+      border-radius: 46%; opacity: .06; pointer-events: none; z-index: 0; background: #fff;
+    }
+    .wave1 { left: -25%; animation: wf 14s infinite ease-in-out alternate; }
+    .wave2 { right:-25%; animation: wf 18s infinite ease-in-out alternate-reverse; }
+    @keyframes wf { 0%{transform:rotate(0) translateY(0);} 100%{transform:rotate(7deg) translateY(28px);} }
+
+    header {
+      width: 100%; padding: 20px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: relative; z-index: 10; flex-wrap: wrap; gap: 10px;
+    }
+    .hdr-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 15px; font-weight: 700; color: rgba(255,255,255,.9);
+    }
+    .live-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.14); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.25); border-radius: 999px;
+      padding: 6px 16px; font-size: 13px; font-weight: 600;
+    }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px #4ade80; animation: blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+
+    main {
+      flex: 1; position: relative; z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; padding: 10px 20px 110px;
+      width: 100%; max-width: 960px;
+    }
+
+    .welcome { font-size: 28px; font-weight: 400; color: rgba(255,255,255,.9); margin-bottom: 6px; }
+
+    .logo-row {
+      display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 24px;
+    }
+    .logo-circle {
+      width: 56px; height: 56px; border-radius: 50%; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,.2);
+    }
+    .brand-name {
+      font-size: clamp(40px, 7vw, 56px); font-weight: 900; letter-spacing: -1.5px;
+      color: #fff; text-shadow: 0 4px 20px rgba(0,0,0,.25);
+    }
+
+    .orb-wrap { position: relative; margin-bottom: 30px; }
+    .orb-halo {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 240px; height: 240px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(56,189,248,.5) 0%, transparent 70%);
+      animation: orbpulse 3.2s infinite ease-in-out; pointer-events: none;
+    }
+    @keyframes orbpulse { 0%,100%{transform:translate(-50%,-50%) scale(.92);opacity:.55;} 50%{transform:translate(-50%,-50%) scale(1.16);opacity:1;} }
+    .orb-btn {
+      width: 180px; height: 180px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 28%, #44b0ff 0%, #0077d8 45%, #004d9d 80%, #003670 100%);
+      border: 4px solid rgba(255,255,255,.42);
+      box-shadow: 0 20px 50px rgba(0,30,80,.5), inset 0 4px 14px rgba(255,255,255,.6), inset 0 -8px 18px rgba(0,0,0,.4);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+      cursor: pointer; text-decoration: none; color: #fff;
+      transition: all .3s cubic-bezier(.4,0,.2,1);
+    }
+    .orb-btn:hover { transform: scale(1.07) translateY(-5px); border-color: rgba(255,255,255,.7); box-shadow: 0 32px 64px rgba(0,50,140,.65); }
+    .orb-btn:active { transform: scale(.97); }
+    .orb-icon { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.95); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+    .orb-label { font-size: 16px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.3); }
+
+    /* ========================================================
+       3D FLOOD INTELLIGENCE MINI PREVIEW WIDGET
+       ======================================================== */
+    .widget-3d-card {
+      width: 100%;
+      max-width: 860px;
+      background: rgba(8, 22, 54, 0.75);
+      backdrop-filter: blur(18px);
+      border: 1.5px solid rgba(56, 189, 248, 0.4);
+      border-radius: 18px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 0 30px rgba(56, 189, 248, 0.2);
+      margin-bottom: 28px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .widget-3d-header {
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .widget-3d-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .widget-3d-canvas-wrap {
+      width: 100%;
+      height: 260px;
+      position: relative;
+      background: radial-gradient(circle at 50% 50%, #0c1a40 0%, #030816 100%);
+    }
+
+    .widget-overlay-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(7, 17, 38, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    .widget-3d-footer {
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: rgba(7, 17, 38, 0.9);
+      border-top: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .widget-stats-strip {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      text-align: left;
+    }
+    .widget-stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .ws-lbl { color: #94a3b8; font-size: 10px; text-transform: uppercase; font-weight: 700; }
+    .ws-val { font-size: 13px; font-weight: 800; color: #fff; }
+
+    .btn-view-full-3d {
+      padding: 10px 22px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+      transition: all 0.2s;
+    }
+    .btn-view-full-3d:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.6);
+      background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%);
+    }
+
+    /* Primary Navigation Buttons Grid */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .dash-btn {
+      padding: 16px 20px; border-radius: 14px;
+      border: 1.5px solid rgba(255,255,255,.28);
+      background: rgba(4,52,114,.55); backdrop-filter: blur(14px);
+      color: #fff; text-decoration: none;
+      display: flex; align-items: center; gap: 14px;
+      transition: all .25s ease;
+      box-shadow: 0 10px 28px rgba(0,0,0,.22);
+    }
+    .dash-btn:hover { transform: translateY(-4px); border-color: #38bdf8; background: rgba(7,72,155,.8); box-shadow: 0 16px 36px rgba(0,0,0,.35), 0 0 22px rgba(56,189,248,.28); }
+
+    .dash-icon { width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .dash-text { text-align: left; }
+    .dash-title { font-size: 16px; font-weight: 800; line-height: 1.2; }
+    .dash-sub   { font-size: 12px; color: rgba(255,255,255,.65); margin-top: 3px; }
+    .caret { margin-left: auto; opacity: .45; font-size: 20px; transition: all .2s; }
+    .dash-btn:hover .caret { opacity: .9; transform: translateX(3px); }
+
+    /* SOS Big Featured Button */
+    .dash-btn.sos-btn-card {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, rgba(220,38,38,.85) 0%, rgba(185,28,28,.95) 100%);
+      border-color: rgba(252,165,165,.6);
+      box-shadow: 0 12px 30px rgba(220,38,38,.45);
+    }
+    .dash-btn.sos-btn-card:hover {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      border-color: #fff;
+      box-shadow: 0 18px 45px rgba(220,38,38,.65), 0 0 25px rgba(239,68,68,.5);
+    }
+
+    /* 3D Flood Intelligence Button Highlight */
+    .dash-btn.d3-highlight {
+      border-color: rgba(56, 189, 248, 0.6);
+      background: linear-gradient(135deg, rgba(2, 132, 199, 0.45) 0%, rgba(30, 58, 138, 0.6) 100%);
+      box-shadow: 0 10px 30px rgba(2, 132, 199, 0.3);
+    }
+    .dash-btn.d3-highlight:hover {
+      border-color: #38bdf8;
+      box-shadow: 0 16px 40px rgba(2, 132, 199, 0.5);
+    }
+
+    /* Floating Direct SOS Button */
+    #floating-sos {
+      position: fixed; bottom: 28px; right: 28px; z-index: 999;
+      width: 74px; height: 74px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ef4444, #b91c1c);
+      border: 3px solid rgba(255,255,255,.6);
+      box-shadow: 0 0 35px rgba(220,38,38,.8), 0 8px 24px rgba(0,0,0,.5);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #fff; font-size: 11px; font-weight: 900; letter-spacing: .04em;
+      text-decoration: none; cursor: pointer;
+      animation: floatpulse 2.2s infinite ease-in-out;
+      transition: transform .2s;
+    }
+    #floating-sos:hover { transform: scale(1.12); }
+    #floating-sos:active { transform: scale(.95); }
+    #floating-sos svg { width: 26px; height: 26px; margin-bottom: 2px; }
+    @keyframes floatpulse { 0%,100%{box-shadow:0 0 35px rgba(220,38,38,.8),0 8px 24px rgba(0,0,0,.5);} 50%{box-shadow:0 0 60px rgba(220,38,38,1),0 8px 32px rgba(0,0,0,.6);} }
+    #floating-sos::before, #floating-sos::after {
+      content:''; position:absolute; border-radius:50%;
+      border:2px solid rgba(239,68,68,.6); animation:ring 2.5s ease-out infinite;
+    }
+    #floating-sos::before { inset:-10px; animation-delay:0s; }
+    #floating-sos::after  { inset:-22px; animation-delay:.6s; }
+    @keyframes ring { 0%{transform:scale(.9);opacity:.8;} 100%{transform:scale(1.5);opacity:0;} }
+
+    footer {
+      width: 100%; padding: 18px 40px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+      position: relative; z-index: 10;
+      border-top: 1px solid rgba(255,255,255,.1);
+      font-size: 12px; color: rgba(255,255,255,.65);
+    }
+    .footer-links { display: flex; gap: 18px; }
+    .footer-links a { color: rgba(255,255,255,.8); text-decoration: none; font-weight: 600; transition: color .2s; }
+    .footer-links a:hover { color: #38bdf8; }
+
+    @media (max-width: 680px) {
+      .dash-grid { grid-template-columns: 1fr; }
+      .brand-name { font-size: 38px; }
+      header, footer { padding: 16px 20px; }
+      #floating-sos { width: 62px; height: 62px; bottom: 18px; right: 18px; }
+      .widget-stats-strip { flex-direction: column; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-halo"></div>
+  <div class="wave wave1"></div>
+  <div class="wave wave2"></div>
+
+  <header>
+    <div class="hdr-brand">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+      FloodGuard AI Early Warning
+    </div>
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      System Operational · Hirakud–Mahanadi
+    </div>
+  </header>
+
+  <main>
+    <div class="welcome">Welcome to</div>
+
+    <div class="logo-row">
+      <div class="logo-circle">
+        <svg viewBox="0 0 100 100" fill="none" style="width:36px;height:36px;">
+          <circle cx="50" cy="50" r="46" stroke="#0077d8" stroke-width="8"/>
+          <path d="M22 45C32 38 42 52 52 45C62 38 72 52 80 45" stroke="#0077d8" stroke-width="7" stroke-linecap="round"/>
+          <path d="M22 60C32 53 42 67 52 60C62 53 72 67 80 60" stroke="#0284c7" stroke-width="7" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1 class="brand-name">FloodGuard</h1>
+    </div>
+
+    <!-- 3D Orb -->
+    <div class="orb-wrap">
+      <div class="orb-halo"></div>
+      <a href="#dashboards" class="orb-btn" onclick="scrollToDash(event)">
+        <div class="orb-icon">
+          <svg viewBox="0 0 100 100" fill="none" style="width:30px;height:30px;">
+            <path d="M20 45C30 38 40 52 50 45C60 38 70 52 80 45" stroke="#0077d8" stroke-width="9" stroke-linecap="round"/>
+            <path d="M20 62C30 55 40 69 50 62C60 55 70 69 80 62" stroke="#0284c7" stroke-width="9" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="orb-label">Enter FloodGuard</div>
+      </a>
+    </div>
+
+    <!-- ========================================================
+         INTEGRATED 3D FLOOD INTELLIGENCE PREVIEW WIDGET
+         ======================================================== -->
+    <div class="widget-3d-card">
+      <div class="widget-3d-header">
+        <div class="widget-3d-title">
+          <i class="fa-solid fa-cube" style="color: #38bdf8;"></i>
+          <span>3D Flood Intelligence & Early Warning System</span>
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 800;">LIVE PREVIEW</span>
+        </div>
+        <a href="/3d" class="btn-view-full-3d">
+          <span>View Full 3D Map</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+
+      <!-- 3D Mini Interactive WebGL Viewport -->
+      <div class="widget-3d-canvas-wrap" id="home-3d-canvas-wrap">
+        <div class="widget-overlay-badge">
+          <i class="fa-solid fa-water"></i>
+          <span>Dynamic Water-Flow & Elevation Gradients</span>
+        </div>
+      </div>
+
+      <!-- Widget Footer Stats & Riverbank Telemetry Summary -->
+      <div class="widget-3d-footer">
+        <div class="widget-stats-strip">
+          <div class="widget-stat-item">
+            <span class="ws-lbl">River Level</span>
+            <span class="ws-val" style="color: #38bdf8;">8.5m (Rising)</span>
+          </div>
+          <div class="widget-stat-item">
+            <span class="ws-lbl">Riverbank Sensors</span>
+            <span class="ws-val" style="color: #ef4444;">Dyke #A1: 2.4mm Crack</span>
+          </div>
+          <div class="widget-stat-item">
+            <span class="ws-lbl">AI 24h Prediction</span>
+            <span class="ws-val" style="color: #f59e0b;">5 Zones Impact Sequence</span>
+          </div>
+          <div class="widget-stat-item">
+            <span class="ws-lbl">Twilio Alerts</span>
+            <span class="ws-val" style="color: #10b981;">SMS + Voice Active</span>
+          </div>
+        </div>
+        <a href="/3d" style="color: #38bdf8; font-size: 12px; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+          <span>Explore 24h Timeline & IoT Telemetry</span>
+          <i class="fa-solid fa-angle-right"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- 5 Dashboard Buttons Grid -->
+    <div class="dash-grid" id="dashboards">
+
+      <!-- 1. SOS Communication System -->
+      <a href="/sos" class="dash-btn sos-btn-card">
+        <div class="dash-icon" style="background:rgba(255,255,255,.25);">
+          <i class="fa-solid fa-tower-broadcast" style="color: #fff;"></i>
+        </div>
+        <div class="dash-text">
+          <div class="dash-title" style="font-size: 18px;">🆘 SOS Communication System</div>
+          <div class="dash-sub" style="color: rgba(255,255,255,.9);">Twilio Voice & WhatsApp · NDRF & ODRAF Coordination · GPS & Camera Feed</div>
+        </div>
+        <div class="caret">›</div>
+      </a>
+
+      <!-- 2. 3D Flood Intelligence System (Featured) -->
+      <a href="/3d" class="dash-btn d3-highlight">
+        <div class="dash-icon" style="background:rgba(56,189,248,.25);">
+          <i class="fa-solid fa-cube" style="color: #38bdf8;"></i>
+        </div>
+        <div class="dash-text">
+          <div class="dash-title">3D Flood Intelligence System</div>
+          <div class="dash-sub">Elevation Mesh · Water Flow · 24h AI Impact Sequence & Riverbank Sensors</div>
+        </div>
+        <div class="caret">›</div>
+      </a>
+
+      <!-- 3. Authority Dashboard -->
+      <a href="/authority" class="dash-btn">
+        <div class="dash-icon" style="background:rgba(56,189,248,.2);">
+          <i class="fa-solid fa-building-shield" style="color: #38bdf8;"></i>
+        </div>
+        <div class="dash-text">
+          <div class="dash-title">Authority Dashboard</div>
+          <div class="dash-sub">Tactical Inundation Map · CWC Telemetry · Risk Gauge & KPIs</div>
+        </div>
+        <div class="caret">›</div>
+      </a>
+
+      <!-- 4. Citizen Alert -->
+      <a href="/citizen" class="dash-btn" style="border-color:rgba(251,191,36,.35);background:rgba(120,53,15,.35);">
+        <div class="dash-icon" style="background:rgba(251,191,36,.2);">
+          <i class="fa-solid fa-triangle-exclamation" style="color: #fbbf24;"></i>
+        </div>
+        <div class="dash-text">
+          <div class="dash-title">Citizen Alert Interface</div>
+          <div class="dash-sub">CAP Alerts · Safe Evacuation Shelters · Safety Guidelines</div>
+        </div>
+        <div class="caret">›</div>
+      </a>
+
+      <!-- 5. Public Weather -->
+      <a href="/public" class="dash-btn" style="border-color:rgba(52,211,153,.3);background:rgba(6,78,59,.35);">
+        <div class="dash-icon" style="background:rgba(52,211,153,.2);">
+          <i class="fa-solid fa-cloud-sun-rain" style="color: #34d399;"></i>
+        </div>
+        <div class="dash-text">
+          <div class="dash-title">Public Weather Forecast</div>
+          <div class="dash-sub">IMD Real-Time Weather · 7-Day Rainfall Forecast & Rain Radar Map</div>
+        </div>
+        <div class="caret">›</div>
+      </a>
+
+    </div>
+  </main>
+
+  <footer>
+    <div>Government of Odisha Disaster Management Authority · NDMA OASIS CAP v1.2</div>
+    <div class="footer-links">
+      <a href="/sos">🆘 Emergency SOS</a>
+      <a href="/3d">3D Intelligence</a>
+      <a href="/authority">Authority</a>
+      <a href="/citizen">Citizen</a>
+      <a href="/public">Weather</a>
+      <a href="/docs">API Docs</a>
+    </div>
+  </footer>
+
+  <!-- Floating Direct SOS Icon (Clickable anywhere on homepage) -->
+  <a href="/sos" id="floating-sos" title="Emergency SOS — Click to call rescue immediately">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    SOS
+  </a>
+
+  <!-- 3D Mini Widget Animation Script -->
+  <script>
+    function scrollToDash(e) {
+      e.preventDefault();
+      const el = document.getElementById('dashboards');
+      el.scrollIntoView({ behavior:'smooth', block:'center' });
+      el.style.transform = 'scale(1.02)';
+      el.style.transition = 'transform .3s ease';
+      setTimeout(() => { el.style.transform = 'scale(1)'; }, 320);
+    }
+
+    // Three.js Mini Rotating 3D Preview Widget
+    (function initMini3D() {
+      const container = document.getElementById('home-3d-canvas-wrap');
+      if (!container) return;
+
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0c1a40);
+      scene.fog = new THREE.FogExp2(0x0c1a40, 0.02);
+
+      const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 1000);
+      camera.position.set(28, 22, 38);
+      camera.lookAt(0, 0, 0);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      container.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0x88bbff, 0.8);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      dirLight.position.set(20, 35, 15);
+      scene.add(dirLight);
+
+      // Terrain Mesh with River Valley
+      const segs = 40;
+      const geom = new THREE.PlaneGeometry(45, 45, segs, segs);
+      geom.rotateX(-Math.PI / 2);
+
+      const pos = geom.attributes.position;
+      const colors = [];
+
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        const riverDist = Math.abs(x - Math.sin(z * 0.15) * 4);
+        let y = Math.sin(x * 0.2) * Math.cos(z * 0.15) * 3;
+        if (riverDist < 7) {
+          y -= (7 - riverDist) * 0.6;
+        }
+        pos.setY(i, y);
+
+        // Color coding by elevation
+        if (y < 0.2) {
+          colors.push(0.93, 0.26, 0.26); // Red
+        } else if (y < 1.8) {
+          colors.push(0.96, 0.62, 0.07); // Yellow
+        } else {
+          colors.push(0.06, 0.72, 0.5);  // Green
+        }
+      }
+
+      geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geom.computeVertexNormals();
+
+      const terrainMat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.8,
+        flatShading: true
+      });
+
+      const terrain = new THREE.Mesh(geom, terrainMat);
+      scene.add(terrain);
+
+      // Animated Water Layer
+      const waterGeom = new THREE.PlaneGeometry(44, 44);
+      waterGeom.rotateX(-Math.PI / 2);
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x0088ff,
+        transparent: true,
+        opacity: 0.65,
+        roughness: 0.1
+      });
+      const water = new THREE.Mesh(waterGeom, waterMat);
+      water.position.y = 0.5;
+      scene.add(water);
+
+      // River flow particles
+      const pCount = 80;
+      const pGeom = new THREE.BufferGeometry();
+      const pPositions = [];
+      for (let i = 0; i < pCount; i++) {
+        const z = (Math.random() - 0.5) * 36;
+        const x = Math.sin(z * 0.15) * 4 + (Math.random() - 0.5) * 4;
+        pPositions.push(x, 0.6, z);
+      }
+      pGeom.setAttribute('position', new THREE.Float32BufferAttribute(pPositions, 3));
+      const pMat = new THREE.PointsMaterial({ color: 0x38bdf8, size: 0.6 });
+      const flowPts = new THREE.Points(pGeom, pMat);
+      scene.add(flowPts);
+
+      function render() {
+        requestAnimationFrame(render);
+        terrain.rotation.y += 0.0015;
+        water.rotation.y += 0.0015;
+        flowPts.rotation.y += 0.0015;
+
+        water.position.y = 0.5 + Math.sin(Date.now() * 0.003) * 0.08;
+
+        const arr = flowPts.geometry.attributes.position.array;
+        for (let i = 2; i < arr.length; i += 3) {
+          arr[i] += 0.15;
+          if (arr[i] > 18) arr[i] = -18;
+        }
+        flowPts.geometry.attributes.position.needsUpdate = true;
+
+        renderer.render(scene, camera);
+      }
+      render();
+
+      window.addEventListener('resize', () => {
+        if (!container) return;
+        const nw = container.clientWidth;
+        const nh = container.clientHeight;
+        camera.aspect = nw / nh;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nw, nh);
+      });
+    })();
+  </script>
+</body>
+</html>

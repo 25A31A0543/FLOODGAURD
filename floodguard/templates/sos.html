@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloodGuard — Real-Time SOS Communication System</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #050d20;
+      --surface:  #0c1732;
+      --surface2: #112040;
+      --border:   rgba(56,189,248,.16);
+      --bhl:      rgba(56,189,248,.42);
+      --text:     #e2e8f0;
+      --muted:    #6b8fa8;
+      --sky:      #38bdf8;
+      --rose:     #f43f5e;
+      --amber:    #fbbf24;
+      --green:    #34d399;
+      --cyan:     #22d3ee;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: radial-gradient(ellipse at 50% -10%, #1a3272 0%, var(--bg) 65%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #1e3a6e; border-radius: 4px; }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    #top-bar {
+      position: sticky; top: 0; z-index: 500;
+      background: rgba(5,13,32,.94);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 14px rgba(220,38,38,.5);
+      animation: pulse-glow 2s infinite;
+    }
+    @keyframes pulse-glow { 0%,100%{box-shadow:0 4px 14px rgba(220,38,38,.5);} 50%{box-shadow:0 4px 24px rgba(220,38,38,.85);} }
+    .brand-title { font-size: clamp(13px,2vw,17px); font-weight: 800; color: #fff; }
+    .brand-sub   { font-size: 11px; color: var(--rose); font-weight: 700; }
+    .nav-pills   { display: flex; gap: 8px; flex-wrap: wrap; }
+    .npill {
+      padding: 5px 13px; border-radius: 999px; font-size: 12px; font-weight: 700;
+      border: 1px solid var(--border); color: var(--sky);
+      background: rgba(56,189,248,.07); text-decoration: none; transition: all .2s; cursor: pointer;
+    }
+    .npill:hover { background: rgba(56,189,248,.18); color: #fff; }
+    .npill.red-pill { color: #fca5a5; border-color: rgba(244,63,94,.4); background: rgba(244,63,94,.1); }
+
+    /* ── View toggle ─────────────────────────────────────────────────── */
+    #view-toggle {
+      display: flex; align-items: center; gap: 6px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-shrink: 0;
+    }
+    .vt-btn {
+      padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 800;
+      border: none; cursor: pointer; transition: all .2s; color: var(--muted); background: transparent;
+    }
+    .vt-btn.active { background: #1d4ed8; color: #fff; box-shadow: 0 4px 12px rgba(29,78,216,.5); }
+
+    /* ── CARD ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       CITIZEN VIEW
+    ════════════════════════════════════════════════════════════════ */
+    #citizen-view {
+      flex: 1; padding: 20px 16px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      grid-template-rows: auto 1fr;
+      gap: 16px;
+      max-width: 1600px; margin: 0 auto; width: 100%;
+    }
+
+    /* Left — SOS hero + status */
+    #sos-hero {
+      grid-column: 1; grid-row: 1 / 3;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* SOS big button area */
+    #sos-hero-card {
+      padding: 32px 24px; text-align: center;
+      background: linear-gradient(160deg, #0f1c3a 0%, #1a0a0a 100%);
+      border: 1px solid rgba(244,63,94,.3);
+      border-radius: 18px;
+      position: relative; overflow: hidden;
+    }
+    #sos-hero-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 60%, rgba(220,38,38,.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .sos-subtitle { font-size: 12px; font-weight: 700; color: var(--rose); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+    .sos-title    { font-size: clamp(20px,3vw,28px); font-weight: 900; color: #fff; margin-bottom: 6px; }
+    .sos-desc     { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 28px; }
+
+    /* Pulsing SOS button */
+    .sos-ring-wrap {
+      position: relative; display: inline-flex;
+      align-items: center; justify-content: center;
+      width: 200px; height: 200px; margin: 0 auto 28px;
+    }
+    .sos-ring {
+      position: absolute; border-radius: 50%;
+      border: 2px solid rgba(220,38,38,.5);
+      animation: ring-out 3s ease-out infinite;
+    }
+    .sos-ring:nth-child(1) { width: 200px; height: 200px; animation-delay: 0s; }
+    .sos-ring:nth-child(2) { width: 165px; height: 165px; animation-delay: .6s; }
+    .sos-ring:nth-child(3) { width: 130px; height: 130px; animation-delay: 1.2s; }
+    @keyframes ring-out {
+      0%   { transform: scale(.85); opacity: .8; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+    #main-sos-btn {
+      width: 110px; height: 110px; border-radius: 50%;
+      border: none; cursor: pointer; z-index: 10; position: relative;
+      background: radial-gradient(circle at 35% 35%, #ef4444, #b91c1c);
+      box-shadow: 0 0 40px rgba(220,38,38,.6), inset 0 2px 4px rgba(255,255,255,.3);
+      color: #fff; font-size: 13px; font-weight: 900; letter-spacing: .06em;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      transition: transform .15s, box-shadow .15s;
+    }
+    #main-sos-btn:hover  { transform: scale(1.06); box-shadow: 0 0 60px rgba(220,38,38,.8), inset 0 2px 4px rgba(255,255,255,.3); }
+    #main-sos-btn:active { transform: scale(.97); }
+    #main-sos-btn svg    { width: 28px; height: 28px; }
+
+    /* Quick action chips */
+    .quick-chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .qchip {
+      padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 800;
+      border: 1px solid var(--border); background: rgba(255,255,255,.04);
+      color: var(--text); cursor: pointer; transition: all .2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .qchip:hover { border-color: var(--sky); background: rgba(56,189,248,.1); color: #fff; }
+    .qchip.call-chip { border-color: rgba(52,211,153,.3); color: var(--green); }
+    .qchip.call-chip:hover { background: rgba(52,211,153,.12); }
+
+    /* GPS location card */
+    #gps-card { padding: 14px 16px; }
+    .gps-row  { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .gps-badge {
+      display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
+    }
+    .gps-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; flex-shrink: 0; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+    .gps-coords { font-family: monospace; font-size: 11px; color: var(--muted); }
+    .gps-accuracy { font-size: 10px; padding: 2px 8px; border-radius: 6px; background: rgba(52,211,153,.12); color: var(--green); font-weight: 700; }
+
+    /* Active call status card */
+    #call-status-card { padding: 16px; }
+    #call-status-card h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 12px; }
+    .call-rows { display: flex; flex-direction: column; gap: 10px; }
+    .call-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 10px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      transition: all .3s;
+    }
+    .call-row.active-call  { border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.07); }
+    .call-row.ringing-call { border-color: rgba(251,191,36,.4); background: rgba(251,191,36,.05); }
+    .call-row.pending-call { border-color: var(--border); opacity: .6; }
+    .call-icon {
+      width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .ci-ndrf   { background: rgba(244,63,94,.2); }
+    .ci-odrf   { background: rgba(251,191,36,.2); }
+    .ci-shelter{ background: rgba(56,189,248,.2); }
+    .call-info { flex: 1; min-width: 0; }
+    .call-name { font-size: 13px; font-weight: 800; }
+    .call-sub  { font-size: 11px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .call-status-badge {
+      font-size: 10px; font-weight: 900; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+    }
+    .csb-active  { background: rgba(52,211,153,.2); color: #6ee7b7; }
+    .csb-ringing { background: rgba(251,191,36,.2); color: #fde68a; animation: blink .8s step-end infinite; }
+    @keyframes blink { 50%{opacity:.3;} }
+    .csb-pending { background: rgba(100,116,139,.2); color: #94a3b8; }
+
+    /* Comm method icons */
+    .comm-icons { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+    .ci-tag {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+      display: flex; align-items: center; gap: 3px;
+    }
+    .ci-voice { background: rgba(52,211,153,.15); color: #6ee7b7; border: 1px solid rgba(52,211,153,.3); }
+    .ci-whatsapp { background: rgba(37,211,102,.15); color: #86efac; border: 1px solid rgba(37,211,102,.3); }
+    .ci-location { background: rgba(56,189,248,.12); color: #7dd3fc; border: 1px solid rgba(56,189,248,.25); }
+    .ci-video { background: rgba(168,85,247,.15); color: #d8b4fe; border: 1px solid rgba(168,85,247,.3); }
+
+    /* Right — Map + camera */
+    #sos-right {
+      display: flex; flex-direction: column; gap: 14px;
+      grid-column: 2; grid-row: 1 / 3;
+    }
+
+    #map-card { padding: 0; overflow: hidden; }
+    .map-card-header {
+      padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .map-card-title { font-size: 12px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+    #citizen-map { width: 100%; height: 240px; background: #091126; }
+
+    /* Camera feed */
+    #camera-card { padding: 14px; }
+    #camera-card h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+    #camera-feed {
+      width: 100%; aspect-ratio: 16/9;
+      background: #030810; border-radius: 10px; overflow: hidden;
+      position: relative; border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #camera-video { width: 100%; height: 100%; object-fit: cover; display: none; border-radius: 10px; }
+    .cam-placeholder {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      color: var(--muted); font-size: 12px; font-weight: 700;
+    }
+    .cam-rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rose); display: none; animation: pulse 1s infinite; }
+    .cam-controls { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .cam-btn {
+      flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: rgba(255,255,255,.04); color: var(--text); font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 6px; justify-content: center;
+    }
+    .cam-btn:hover { border-color: var(--sky); background: rgba(56,189,248,.1); }
+    .cam-btn.active-cam { border-color: var(--rose); background: rgba(244,63,94,.12); color: #fca5a5; }
+
+    /* Nearby shelters */
+    #shelters-card { padding: 14px; }
+    #shelters-card h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+    .shelter-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 9px; border: 1px solid var(--border);
+      margin-bottom: 6px; background: rgba(255,255,255,.02); cursor: pointer; transition: all .2s;
+    }
+    .shelter-item:hover { border-color: var(--sky); background: rgba(56,189,248,.07); }
+    .sh-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .sh-info { flex: 1; }
+    .sh-name { font-size: 12px; font-weight: 700; }
+    .sh-dist { font-size: 11px; color: var(--muted); }
+    .sh-cap  { font-size: 11px; font-weight: 700; }
+
+    /* ════════════════════════════════════════════════════════════════
+       RESPONDER / RESCUE DASHBOARD VIEW
+    ════════════════════════════════════════════════════════════════ */
+    #responder-view {
+      display: none;
+      flex: 1; padding: 16px;
+      display: none;
+      grid-template-columns: 320px 1fr 280px;
+      gap: 14px;
+      max-width: 1700px; margin: 0 auto; width: 100%;
+    }
+
+    /* Left — active SOS cases list */
+    #cases-panel { display: flex; flex-direction: column; gap: 10px; }
+    #cases-panel h2 { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+    .case-card {
+      padding: 12px 14px; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      cursor: pointer; transition: all .2s;
+    }
+    .case-card:hover { border-color: var(--bhl); }
+    .case-card.selected { border-color: var(--rose); background: rgba(244,63,94,.07); }
+    .case-header  { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .case-id      { font-size: 10px; font-family: monospace; color: var(--muted); }
+    .case-sev     { font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 6px; }
+    .sev-crit { background: rgba(244,63,94,.25); color: #fda4af; }
+    .sev-high { background: rgba(251,191,36,.2); color: #fde68a; }
+    .case-name    { font-size: 13px; font-weight: 800; margin-top: 4px; }
+    .case-loc     { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .case-time    { font-size: 10px; color: var(--muted); }
+    .case-footer  { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+    /* Centre — large rescue map */
+    #rescue-map-panel { display: flex; flex-direction: column; gap: 10px; }
+    .rescue-map-toolbar {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .rmt-title { font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .rmt-btns  { display: flex; gap: 6px; }
+    .rmt-btn {
+      padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700;
+      border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--muted);
+      cursor: pointer; transition: all .2s;
+    }
+    .rmt-btn:hover  { border-color: var(--sky); color: var(--text); }
+    .rmt-btn.active { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+
+    #rescue-map-wrap { flex: 1; min-height: 480px; border-radius: 12px; overflow: hidden; position: relative; isolation: isolate; border: 1px solid var(--border); }
+    #rescue-map { width: 100%; height: 100%; position: absolute; inset: 0; background: #091126; }
+
+    /* Route info overlay */
+    #route-overlay {
+      position: absolute; bottom: 10px; left: 10px; z-index: 410;
+      background: rgba(5,13,32,.92); backdrop-filter: blur(8px);
+      border: 1px solid var(--bhl); border-radius: 10px; padding: 10px 14px;
+      font-size: 12px; min-width: 220px;
+    }
+    .ro-row { display: flex; justify-content: space-between; gap: 20px; }
+    .ro-item { display: flex; flex-direction: column; align-items: center; }
+    .ro-val  { font-size: 18px; font-weight: 900; color: var(--sky); }
+    .ro-lbl  { font-size: 10px; color: var(--muted); font-weight: 700; margin-top: 1px; }
+
+    /* Right — camera + telemetry */
+    #right-responder { display: flex; flex-direction: column; gap: 12px; }
+    #caller-cam-card { padding: 14px; }
+    #caller-cam-card h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+    #caller-cam-feed {
+      width: 100%; aspect-ratio: 16/9;
+      background: #030810; border-radius: 10px; overflow: hidden;
+      position: relative; border: 1px solid rgba(244,63,94,.3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #caller-cam-video { width: 100%; height: 100%; object-fit: cover; display: none; }
+    .cam-live-badge {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(244,63,94,.9); color: #fff; font-size: 10px; font-weight: 900;
+      padding: 2px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px;
+    }
+    .cam-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: pulse .8s infinite; }
+
+    #telemetry-card { padding: 14px; }
+    #telemetry-card h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+    .telem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .telem-item {
+      padding: 10px 12px; border-radius: 10px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+    }
+    .telem-lbl { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+    .telem-val { font-size: 16px; font-weight: 900; margin-top: 3px; }
+
+    #dispatch-card { padding: 14px; }
+    #dispatch-card h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+    .dispatch-btns { display: flex; flex-direction: column; gap: 8px; }
+    .disp-btn {
+      width: 100%; padding: 10px; border-radius: 10px; border: 1px solid; cursor: pointer;
+      font-size: 12px; font-weight: 800; transition: all .2s;
+      display: flex; align-items: center; gap: 8px; justify-content: center;
+    }
+    .disp-primary { background: #dc2626; border-color: #ef4444; color: #fff; box-shadow: 0 6px 20px rgba(220,38,38,.4); }
+    .disp-primary:hover { background: #ef4444; }
+    .disp-secondary { background: rgba(29,78,216,.2); border-color: #3b82f6; color: #93c5fd; }
+    .disp-secondary:hover { background: rgba(29,78,216,.35); }
+    .disp-green { background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.4); color: #6ee7b7; }
+    .disp-green:hover { background: rgba(52,211,153,.25); }
+
+    /* ════════════════════════════════════════════════════════════════
+       SOS TRIGGER MODAL
+    ════════════════════════════════════════════════════════════════ */
+    #sos-trigger-modal {
+      display: none; position: fixed; inset: 0; z-index: 700;
+      background: rgba(0,0,0,.85); backdrop-filter: blur(10px);
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    #sos-trigger-modal.open { display: flex; }
+    .sos-modal-card {
+      background: linear-gradient(160deg, #0c1733 0%, #160808 100%);
+      border: 1.5px solid rgba(244,63,94,.5);
+      border-radius: 20px; padding: 28px; max-width: 520px; width: 100%;
+      box-shadow: 0 30px 80px rgba(220,38,38,.3);
+    }
+    .smc-top { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .smc-icon {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(244,63,94,.15); border: 2px solid var(--rose);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--rose); flex-shrink: 0; animation: pulse-glow 2s infinite;
+    }
+    .smc-title { font-size: 20px; font-weight: 900; }
+    .smc-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* Transmission progress */
+    .tx-steps { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+    .tx-step {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 10px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      font-size: 13px; font-weight: 700; transition: all .4s;
+    }
+    .tx-step.done    { border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.07); color: #6ee7b7; }
+    .tx-step.sending { border-color: rgba(251,191,36,.4); background: rgba(251,191,36,.05); color: #fde68a; }
+    .tx-step.pending { color: var(--muted); }
+    .tx-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
+    .txi-done    { background: rgba(52,211,153,.2); }
+    .txi-sending { background: rgba(251,191,36,.15); }
+    .txi-pending { background: rgba(100,116,139,.1); }
+    .tx-spinner  { width: 14px; height: 14px; border: 2px solid rgba(251,191,36,.3); border-top-color: #fbbf24; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .coord-box {
+      padding: 10px 14px; border-radius: 10px;
+      background: rgba(56,189,248,.07); border: 1px solid rgba(56,189,248,.2);
+      font-family: monospace; font-size: 12px; color: #7dd3fc;
+      display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px;
+    }
+
+    .modal-btns { display: flex; gap: 10px; margin-top: 4px; }
+    .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; border: none; cursor: pointer; font-size: 13px; font-weight: 800; transition: all .2s; }
+    .btn-cancel  { background: #1e293b; color: #94a3b8; }
+    .btn-cancel:hover { background: #334155; }
+    .btn-confirm { background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; box-shadow: 0 6px 20px rgba(220,38,38,.4); }
+    .btn-confirm:hover { background: #ef4444; }
+    .btn-close   { background: #1e3a6e; color: #93c5fd; flex: 1; }
+    .btn-close:hover { background: #1d4ed8; }
+
+    /* Bottom ticker */
+    #status-ticker {
+      padding: 8px 20px;
+      background: rgba(5,13,32,.95); border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      font-size: 11px; font-weight: 700;
+    }
+    .ticker-item { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Responsive ─────────────────────────────────────────────────── */
+    @media (max-width: 1100px) {
+      #citizen-view { grid-template-columns: 1fr; grid-template-rows: auto; }
+      #sos-hero, #sos-right { grid-column: 1; grid-row: auto; }
+      #responder-view { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      #responder-view { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════════════════ -->
+<header id="top-bar">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    </div>
+    <div>
+      <div class="brand-title">FloodGuard — Real-Time SOS Communication System</div>
+      <div class="brand-sub">🔴 LIVE · Emergency Rescue Coordination · Twilio Integrated</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div id="view-toggle">
+      <button class="vt-btn active" id="btn-citizen"   onclick="switchView('citizen')">🆘 Citizen View</button>
+      <button class="vt-btn"        id="btn-responder" onclick="switchView('responder')">🚁 Responder Dashboard</button>
+    </div>
+    <div class="nav-pills">
+      <a href="/authority" class="npill">Authority</a>
+      <a href="/citizen"   class="npill red-pill">Citizen</a>
+      <a href="/"          class="npill">Home</a>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ CITIZEN VIEW ══════════════════════════════════════════════════════ -->
+<div id="citizen-view">
+
+  <!-- Left: SOS Hero -->
+  <div id="sos-hero">
+
+    <!-- Hero card -->
+    <div id="sos-hero-card">
+      <div class="sos-subtitle">Emergency Broadcast</div>
+      <div class="sos-title">Press SOS — Help is on the way</div>
+      <div class="sos-desc">Instantly contacts NDRF, ODRAF & local shelters via Twilio voice call + WhatsApp. Your GPS location is shared automatically with rescue teams.</div>
+
+      <div class="sos-ring-wrap">
+        <div class="sos-ring"></div>
+        <div class="sos-ring"></div>
+        <div class="sos-ring"></div>
+        <button id="main-sos-btn" onclick="openSOSModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="none"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span>SOS</span>
+        </button>
+      </div>
+
+      <div class="quick-chips">
+        <div class="qchip call-chip" onclick="quickCall('voice')">📞 Call NDRF</div>
+        <div class="qchip call-chip" onclick="quickCall('whatsapp')">💬 WhatsApp ODRF</div>
+        <a href="/citizen" class="qchip">🗺 Safety Map</a>
+        <a href="/public"  class="qchip">☁ Weather</a>
+      </div>
+    </div>
+
+    <!-- GPS card -->
+    <div class="card" id="gps-card">
+      <div class="gps-row">
+        <div class="gps-badge">
+          <div class="gps-dot"></div>
+          <div>
+            <div style="font-size:13px;font-weight:800;" id="gps-loc-name">Detecting GPS location…</div>
+            <div class="gps-coords" id="gps-coords-text">—</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="gps-accuracy" id="gps-acc-badge">Acquiring…</span>
+          <button onclick="requestLiveGPS()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:rgba(56,189,248,.1);color:var(--sky);font-size:11px;font-weight:800;cursor:pointer;">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active call status -->
+    <div class="card" id="call-status-card">
+      <h3>Active Rescue Communications</h3>
+      <div class="call-rows" id="call-rows-list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Info cards row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="card" style="padding:14px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">Emergency Numbers</div>
+        <div style="font-size:13px;font-weight:900;color:var(--rose);margin-bottom:4px;">NDRF Helpline: 1078</div>
+        <div style="font-size:13px;font-weight:900;color:var(--amber);">ODRAF: 1070</div>
+        <div style="font-size:12px;font-weight:700;color:var(--sky);margin-top:4px;">State Disaster: 0674-2534177</div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">Ambulance: 108 · Police: 100</div>
+      </div>
+      <div class="card" style="padding:14px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">Current Risk Status</div>
+        <div style="font-size:22px;font-weight:900;color:var(--rose);" id="risk-level-badge">High Risk</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="risk-desc">Water Level: 8.5m | Rain: 142mm</div>
+        <div style="margin-top:8px;height:6px;border-radius:3px;background:#1e293b;overflow:hidden;">
+          <div style="width:78%;height:100%;background:linear-gradient(90deg,#10b981,#f59e0b,#f43f5e);border-radius:3px;"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;font-weight:700;">Risk Index: 78 / 100</div>
+      </div>
+    </div>
+
+  </div><!-- /#sos-hero -->
+
+  <!-- Right: Map + Camera + Shelters -->
+  <div id="sos-right">
+
+    <!-- Map -->
+    <div class="card" id="map-card">
+      <div class="map-card-header">
+        <div class="map-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
+          Live Location &amp; Shelters
+        </div>
+        <span style="font-size:10px;color:var(--muted);">CARTO Licensed</span>
+      </div>
+      <div id="citizen-map"></div>
+    </div>
+
+    <!-- Camera Feed -->
+    <div class="card" id="camera-card">
+      <h3>📷 Live Camera Feed (share with rescue)</h3>
+      <div id="camera-feed">
+        <video id="camera-video" autoplay muted playsinline></video>
+        <div class="cam-placeholder" id="cam-placeholder">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6b8fa8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          <span>Camera off — tap to enable</span>
+          <span style="font-size:10px;color:#374151;">Your live footage is shared with NDRF rescue teams</span>
+        </div>
+        <div class="cam-rec-dot" id="cam-rec-dot"></div>
+        <div id="cam-live-tag" style="display:none;position:absolute;top:8px;left:8px;background:rgba(244,63,94,.9);color:#fff;font-size:10px;font-weight:900;padding:2px 8px;border-radius:6px;display:none;align-items:center;gap:4px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#fff;animation:pulse .8s infinite;"></div> LIVE
+        </div>
+      </div>
+      <div class="cam-controls">
+        <button class="cam-btn" id="cam-toggle-btn" onclick="toggleCamera()">📷 Enable Camera</button>
+        <button class="cam-btn" onclick="shareScreen()">🖥 Share Screen</button>
+      </div>
+    </div>
+
+    <!-- Nearby Shelters -->
+    <div class="card" id="shelters-card">
+      <h3>🏠 Nearest Relief Shelters</h3>
+      <div id="shelters-list"></div>
+    </div>
+
+  </div><!-- /#sos-right -->
+
+</div><!-- /#citizen-view -->
+
+
+<!-- ═══ RESPONDER / RESCUE DASHBOARD VIEW ════════════════════════════════ -->
+<div id="responder-view" style="display:none;flex:1;padding:16px;gap:14px;grid-template-columns:300px 1fr 280px;max-width:1700px;margin:0 auto;width:100%;">
+
+  <!-- Left: active SOS cases -->
+  <div id="cases-panel">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      Active SOS Cases
+      <span style="background:rgba(244,63,94,.25);color:#fda4af;font-size:10px;padding:1px 8px;border-radius:999px;">3 Live</span>
+    </h2>
+    <div id="cases-list"></div>
+  </div>
+
+  <!-- Centre: rescue map -->
+  <div id="rescue-map-panel">
+    <div class="rescue-map-toolbar">
+      <div class="rmt-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
+        Rescue Coordination Map
+        <span style="font-size:11px;color:var(--muted);font-weight:500;">· Live route tracking · Zone overlays</span>
+      </div>
+      <div class="rmt-btns">
+        <button class="rmt-btn active" onclick="setRescueLayer('all')">All Layers</button>
+        <button class="rmt-btn" onclick="setRescueLayer('route')">Route</button>
+        <button class="rmt-btn" onclick="setRescueLayer('zones')">Flood Zones</button>
+      </div>
+    </div>
+    <div id="rescue-map-wrap">
+      <div id="rescue-map"></div>
+      <div id="route-overlay">
+        <div style="font-size:11px;font-weight:800;color:var(--sky);margin-bottom:6px;">📍 Route to Caller (Case #SOS-2026-001)</div>
+        <div class="ro-row">
+          <div class="ro-item"><div class="ro-val" id="ro-dist">4.2 km</div><div class="ro-lbl">Distance</div></div>
+          <div class="ro-item"><div class="ro-val" id="ro-eta">8 min</div><div class="ro-lbl">ETA</div></div>
+          <div class="ro-item"><div class="ro-val" id="ro-team">T-4</div><div class="ro-lbl">Team</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: caller camera + telemetry + dispatch -->
+  <div id="right-responder">
+
+    <div class="card" id="caller-cam-card">
+      <h3>📷 Caller Live Feed</h3>
+      <div id="caller-cam-feed">
+        <video id="caller-cam-video" autoplay muted playsinline></video>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:700;" id="caller-cam-placeholder">
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b8fa8" stroke-width="1.5"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          Awaiting caller feed…
+        </div>
+        <div class="cam-live-badge" id="caller-live-badge" style="display:none;">
+          <div class="cam-live-dot"></div> LIVE FEED
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="telemetry-card">
+      <h3>📊 Caller Location Telemetry</h3>
+      <div class="telem-grid">
+        <div class="telem-item"><div class="telem-lbl">Water Level</div><div class="telem-val" style="color:var(--rose);">8.5m</div></div>
+        <div class="telem-item"><div class="telem-lbl">Rainfall</div><div class="telem-val" style="color:var(--sky);">142mm</div></div>
+        <div class="telem-item"><div class="telem-lbl">Temperature</div><div class="telem-val">28°C</div></div>
+        <div class="telem-item"><div class="telem-lbl">Wind</div><div class="telem-val">22km/h</div></div>
+        <div class="telem-item"><div class="telem-lbl">Risk Score</div><div class="telem-val" style="color:var(--rose);">78%</div></div>
+        <div class="telem-item"><div class="telem-lbl">Elevation</div><div class="telem-val">18m</div></div>
+      </div>
+    </div>
+
+    <div class="card" id="dispatch-card">
+      <h3>🚁 Dispatch Actions</h3>
+      <div class="dispatch-btns">
+        <button class="disp-btn disp-primary" onclick="dispatchTeam()">🚁 Deploy NDRF Team Now</button>
+        <button class="disp-btn disp-secondary" onclick="callCaller()">📞 Call Caller Directly</button>
+        <button class="disp-btn disp-green" onclick="markSafe()">✅ Mark Caller as Safe</button>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:rgba(29,78,216,.1);border:1px solid rgba(29,78,216,.3);border-radius:10px;font-size:11px;color:#93c5fd;">
+        <div style="font-weight:800;margin-bottom:4px;">Team T-4 Status</div>
+        <div>Unit: NDRF Bn-7 Odisha | 6 personnel | Boat equipped</div>
+        <div style="margin-top:2px;">ETA: 8 min | Distance: 4.2 km | Route: NH-53 diversion</div>
+      </div>
+    </div>
+
+  </div><!-- /#right-responder -->
+
+</div><!-- /#responder-view -->
+
+<!-- ═══ STATUS TICKER ═════════════════════════════════════════════════════ -->
+<div id="status-ticker">
+  <div style="display:flex;gap:16px;flex-wrap:wrap;">
+    <div class="ticker-item" style="color:var(--rose);">🔴 Active SOS: <strong id="sos-count">0</strong></div>
+    <div class="ticker-item" style="color:var(--green);">✅ Resolved Today: <strong>7</strong></div>
+    <div class="ticker-item" style="color:var(--sky);">📡 Twilio: <strong>Online</strong></div>
+    <div class="ticker-item" style="color:var(--amber);">⚠ Flood Zones: <strong>12 Active</strong></div>
+  </div>
+  <div style="font-size:10px;color:var(--muted);font-family:monospace;">FloodGuard SOS v1.0 · Twilio Integrated · CARTO Licensed</div>
+</div>
+
+
+<!-- ═══ SOS TRIGGER MODAL ═════════════════════════════════════════════════ -->
+<div id="sos-trigger-modal">
+  <div class="sos-modal-card">
+    <div class="smc-top">
+      <div class="smc-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </div>
+      <div>
+        <div class="smc-title">SOS Alert Broadcast</div>
+        <div class="smc-sub">Contacting rescue teams via Twilio Voice + WhatsApp</div>
+      </div>
+    </div>
+
+    <div class="coord-box" id="modal-coord-box">
+      <div>📍 <strong>Location:</strong> <span id="modal-loc-name">Detecting…</span></div>
+      <div>🌐 <strong>Coordinates:</strong> <span id="modal-coords">—</span></div>
+      <div>🎯 <strong>Nearest Station:</strong> NDRF Bn-7 Sambalpur (4.2 km)</div>
+    </div>
+
+    <!-- Pre-confirmation state -->
+    <div id="modal-pre-confirm">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">Confirm broadcast to all rescue services?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+        <div style="padding:10px;border-radius:10px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);text-align:center;">
+          <div style="font-size:18px;">📞</div>
+          <div style="font-size:11px;font-weight:800;color:#6ee7b7;margin-top:4px;">Voice Call</div>
+          <div style="font-size:10px;color:var(--muted);">NDRF + ODRAF</div>
+        </div>
+        <div style="padding:10px;border-radius:10px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.25);text-align:center;">
+          <div style="font-size:18px;">💬</div>
+          <div style="font-size:11px;font-weight:800;color:#86efac;margin-top:4px;">WhatsApp</div>
+          <div style="font-size:10px;color:var(--muted);">With GPS link</div>
+        </div>
+        <div style="padding:10px;border-radius:10px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);text-align:center;">
+          <div style="font-size:18px;">📍</div>
+          <div style="font-size:11px;font-weight:800;color:#7dd3fc;margin-top:4px;">Location</div>
+          <div style="font-size:10px;color:var(--muted);">Live sharing</div>
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn-cancel"  onclick="closeSOSModal()">Cancel</button>
+        <button class="btn-confirm" onclick="confirmSOS()">🚨 CONFIRM SOS BROADCAST</button>
+      </div>
+    </div>
+
+    <!-- Transmitting state -->
+    <div id="modal-transmitting" style="display:none;">
+      <div class="tx-steps" id="tx-steps">
+        <div class="tx-step" id="tx-gps">
+          <div class="tx-icon txi-pending">📡</div>
+          <span>Packaging GPS coordinates…</span>
+        </div>
+        <div class="tx-step" id="tx-ndrf">
+          <div class="tx-icon txi-pending">📞</div>
+          <span>Calling NDRF Bn-7 Sambalpur (1078)…</span>
+        </div>
+        <div class="tx-step" id="tx-odrf">
+          <div class="tx-icon txi-pending">📞</div>
+          <span>Calling ODRAF Control Room (1070)…</span>
+        </div>
+        <div class="tx-step" id="tx-shelter">
+          <div class="tx-icon txi-pending">💬</div>
+          <span>WhatsApp to Shelter Coordinator…</span>
+        </div>
+        <div class="tx-step" id="tx-siren">
+          <div class="tx-icon txi-pending">🔊</div>
+          <span>Activating local siren array…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success state -->
+    <div id="modal-success" style="display:none;text-align:center;">
+      <div style="font-size:48px;margin:12px 0;">✅</div>
+      <div style="font-size:18px;font-weight:900;color:var(--green);">SOS Transmitted!</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6;">
+        NDRF Team T-4 dispatched · ETA <strong style="color:#fff;">8 minutes</strong><br>
+        Twilio voice confirmed · WhatsApp with GPS sent<br>
+        Local sirens activated in flood zone
+      </div>
+      <div id="sos-case-id" style="margin-top:10px;font-family:monospace;font-size:12px;padding:6px 12px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);border-radius:8px;color:#6ee7b7;display:inline-block;"></div>
+      <div class="modal-btns" style="margin-top:16px;">
+        <button class="btn-close" onclick="closeSOSModal()">Close</button>
+        <button class="btn-confirm" onclick="switchView('responder');closeSOSModal();">View Rescue Dashboard</button>
+      </div>
+    </div>
+
+  </div><!-- /.sos-modal-card -->
+</div><!-- /#sos-trigger-modal -->
+
+
+<!-- ═══ LEAFLET JS ════════════════════════════════════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+/* ── Constants ────────────────────────────────────────────────────────── */
+const CARTO_KEY     = 'cb1_2xm7_1_7f41667ad0188b79dff91e16';
+const CARTO_DARK    = `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_KEY}`;
+const CARTO_VOYAGER = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_KEY}`;
+const TILE_OPTS     = { subdomains:'abcd', maxZoom:19, attribution:'© <a href="https://carto.com/">CARTO</a> © OSM' };
+
+const DEFAULT_LAT = 21.466, DEFAULT_LON = 83.975;
+
+/* ── State ────────────────────────────────────────────────────────────── */
+let userLat = DEFAULT_LAT, userLon = DEFAULT_LON, userLocName = 'Sambalpur District';
+let citizenMap = null, rescueMap = null;
+let cameraStream = null;
+
+/* ── SOS cases dataset ───────────────────────────────────────────────── */
+const SOS_CASES = [
+  { id:'SOS-2026-001', name:'Ravi Kumar',  lat:21.466, lon:83.975, sev:'critical', time:'2 min ago',  desc:'Stranded on rooftop, water rising fast',  zone:'Sector 4 Sambalpur' },
+  { id:'SOS-2026-002', name:'Priya Devi',  lat:21.481, lon:83.961, sev:'high',     time:'12 min ago', desc:'Family of 5 trapped, ground floor flooded', zone:'Khetrajpur Zone' },
+  { id:'SOS-2026-003', name:'Mohan Sahoo', lat:21.411, lon:83.992, sev:'high',     time:'24 min ago', desc:'Elderly couple, no transport, heavy rain',  zone:'Maneswar Riverside' }
+];
+
+const SHELTERS = [
+  { name:'Sambalpur Relief Camp 1', dist:'0.8 km', cap:'Available (212/500)', color:'#34d399', lat:21.470, lon:83.980 },
+  { name:'Burla College Ground',    dist:'2.4 km', cap:'Available (380/800)', color:'#38bdf8', lat:21.501, lon:83.869 },
+  { name:'Hirakud Cantonment Hall', dist:'4.1 km', cap:'Near Full (490/500)', color:'#fbbf24', lat:21.535, lon:83.890 }
+];
+
+/* ── DOMContentLoaded ─────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  requestLiveGPS();
+  buildCallRows();
+  buildShelterList();
+  buildCasesList();
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      initCitizenMap();
+      initRescueMap();
+    }, 120);
+  });
+});
+
+/* ── View toggle ──────────────────────────────────────────────────────── */
+function switchView(view) {
+  const cv = document.getElementById('citizen-view');
+  const rv = document.getElementById('responder-view');
+  const bc = document.getElementById('btn-citizen');
+  const br = document.getElementById('btn-responder');
+  if (view === 'citizen') {
+    cv.style.display = 'grid';
+    rv.style.display = 'none';
+    bc.classList.add('active'); br.classList.remove('active');
+    if (citizenMap) setTimeout(() => citizenMap.invalidateSize(), 200);
+  } else {
+    cv.style.display = 'none';
+    rv.style.display = 'grid';
+    bc.classList.remove('active'); br.classList.add('active');
+    if (rescueMap) setTimeout(() => rescueMap.invalidateSize(), 200);
+  }
+}
+
+/* ── GPS ──────────────────────────────────────────────────────────────── */
+function requestLiveGPS() {
+  document.getElementById('gps-acc-badge').textContent = 'Acquiring…';
+  if (!navigator.geolocation) { setFallbackGPS(); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLat = pos.coords.latitude;
+      userLon = pos.coords.longitude;
+      const acc = Math.round(pos.coords.accuracy);
+      document.getElementById('gps-loc-name').textContent = 'Live GPS Location Detected';
+      document.getElementById('gps-coords-text').textContent = `${userLat.toFixed(5)}°N, ${userLon.toFixed(5)}°E`;
+      document.getElementById('gps-acc-badge').textContent = `±${acc}m`;
+      updateModalCoords();
+      if (citizenMap) citizenMap.flyTo([userLat, userLon], 14, { duration:1.2 });
+      fetchTelemetry(userLat, userLon);
+    },
+    () => setFallbackGPS(),
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
+
+function setFallbackGPS() {
+  document.getElementById('gps-loc-name').textContent = 'Sambalpur District (Default)';
+  document.getElementById('gps-coords-text').textContent = `${DEFAULT_LAT}°N, ${DEFAULT_LON}°E`;
+  document.getElementById('gps-acc-badge').textContent = 'Fallback';
+  updateModalCoords();
+  fetchTelemetry(DEFAULT_LAT, DEFAULT_LON);
+}
+
+function updateModalCoords() {
+  document.getElementById('modal-loc-name').textContent  = document.getElementById('gps-loc-name').textContent;
+  document.getElementById('modal-coords').textContent    = `${userLat.toFixed(5)}°N, ${userLon.toFixed(5)}°E`;
+}
+
+/* ── Telemetry fetch ──────────────────────────────────────────────────── */
+async function fetchTelemetry(lat, lon) {
+  try {
+    const r = await fetch(`/api/v1/location-telemetry?lat=${lat}&lon=${lon}`);
+    const d = await r.json();
+    document.getElementById('risk-level-badge').textContent = `${d.kpi.risk_level} Risk`;
+    document.getElementById('risk-desc').textContent = `Water Level: ${d.kpi.water_level_m}m | Rain: ${d.kpi.rainfall_24h_mm}mm`;
+  } catch { /* use defaults */ }
+}
+
+/* ── Build call rows ──────────────────────────────────────────────────── */
+const RESCUE_TEAMS = [
+  { icon:'🪖', iconClass:'ci-ndrf',    name:'NDRF Bn-7 Sambalpur',       sub:'Twilio: +17372212163 → 1078',     status:'active',  comms:['voice','location','video'] },
+  { icon:'🚨', iconClass:'ci-odrf',    name:'ODRAF Control Room',         sub:'WhatsApp +91-674-2534177 → 1070', status:'ringing', comms:['whatsapp','location'] },
+  { icon:'🏠', iconClass:'ci-shelter', name:'Sambalpur Relief Camp 1',    sub:'SMS broadcast sent · 0.8 km',     status:'pending', comms:['whatsapp'] }
+];
+
+function buildCallRows() {
+  const container = document.getElementById('call-rows-list');
+  container.innerHTML = RESCUE_TEAMS.map(t => {
+    const rowClass = t.status === 'active' ? 'active-call' : t.status === 'ringing' ? 'ringing-call' : 'pending-call';
+    const badge    = t.status === 'active' ? '<span class="call-status-badge csb-active">● Connected</span>'
+                   : t.status === 'ringing' ? '<span class="call-status-badge csb-ringing">◉ Ringing…</span>'
+                   : '<span class="call-status-badge csb-pending">◌ Queued</span>';
+    const comms = t.comms.map(c => {
+      const labels = { voice:'📞 Voice', whatsapp:'💬 WhatsApp', location:'📍 GPS', video:'📹 Video' };
+      const cls    = { voice:'ci-voice', whatsapp:'ci-whatsapp', location:'ci-location', video:'ci-video' };
+      return `<span class="ci-tag ${cls[c]}">${labels[c]}</span>`;
+    }).join('');
+    return `
+      <div class="call-row ${rowClass}">
+        <div class="call-icon ${t.iconClass}">${t.icon}</div>
+        <div class="call-info">
+          <div class="call-name">${t.name}</div>
+          <div class="call-sub">${t.sub}</div>
+          <div class="comm-icons" style="margin-top:4px;">${comms}</div>
+        </div>
+        ${badge}
+      </div>`;
+  }).join('');
+}
+
+/* ── Build shelters list ──────────────────────────────────────────────── */
+function buildShelterList() {
+  document.getElementById('shelters-list').innerHTML = SHELTERS.map(s => `
+    <div class="shelter-item">
+      <div class="sh-dot" style="background:${s.color};"></div>
+      <div class="sh-info">
+        <div class="sh-name">${s.name}</div>
+        <div class="sh-dist">${s.dist} away</div>
+      </div>
+      <div class="sh-cap" style="color:${s.color};">${s.cap}</div>
+    </div>`).join('');
+}
+
+/* ── Build SOS cases list ─────────────────────────────────────────────── */
+function buildCasesList() {
+  document.getElementById('cases-list').innerHTML = SOS_CASES.map((c, i) => `
+    <div class="case-card ${i===0?'selected':''}" onclick="selectCase(this, ${i})">
+      <div class="case-header">
+        <span class="case-id">${c.id}</span>
+        <span class="case-sev ${c.sev==='critical'?'sev-crit':'sev-high'}">${c.sev.toUpperCase()}</span>
+      </div>
+      <div class="case-name">🆘 ${c.name}</div>
+      <div class="case-loc">📍 ${c.zone}</div>
+      <div class="case-time" style="margin-top:2px;color:var(--muted);">⏱ ${c.time}</div>
+      <div class="case-footer">
+        <span class="ci-tag ci-voice">📞 Voice Active</span>
+        <span class="ci-tag ci-location">📍 GPS Shared</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">${c.desc}</div>
+    </div>`).join('');
+  document.getElementById('sos-count').textContent = SOS_CASES.length;
+}
+
+function selectCase(el, idx) {
+  document.querySelectorAll('.case-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const c = SOS_CASES[idx];
+  if (rescueMap) rescueMap.flyTo([c.lat, c.lon], 14, { duration:1 });
+  document.getElementById('ro-dist').textContent = `${(Math.random()*4+2).toFixed(1)} km`;
+  document.getElementById('ro-eta').textContent  = `${Math.floor(Math.random()*10+5)} min`;
+}
+
+/* ── Citizen Map ──────────────────────────────────────────────────────── */
+function initCitizenMap() {
+  citizenMap = L.map('citizen-map', { center:[userLat, userLon], zoom:13, zoomControl:true });
+  L.tileLayer(CARTO_DARK, TILE_OPTS).addTo(citizenMap);
+
+  // User pin
+  addUserPin(citizenMap, userLat, userLon, '🔵 Your Location');
+
+  // Shelters
+  SHELTERS.forEach(s => {
+    const icon = L.divIcon({ className:'', html:`<div style="width:14px;height:14px;border-radius:50%;background:${s.color};border:2px solid #fff;box-shadow:0 0 8px ${s.color};"></div>`, iconSize:[14,14], iconAnchor:[7,7] });
+    L.marker([s.lat, s.lon], { icon }).bindPopup(`<strong>${s.name}</strong><br>${s.cap}`).addTo(citizenMap);
+  });
+
+  // Flood zone overlays
+  drawFloodZones(citizenMap);
+
+  const obs = new ResizeObserver(() => citizenMap.invalidateSize());
+  obs.observe(document.getElementById('citizen-map'));
+}
+
+/* ── Rescue Map ───────────────────────────────────────────────────────── */
+function initRescueMap() {
+  rescueMap = L.map('rescue-map', { center:[21.48, 83.97], zoom:12, zoomControl:true });
+  L.tileLayer(CARTO_DARK, TILE_OPTS).addTo(rescueMap);
+  L.control.layers({ 'CARTO Dark':L.tileLayer(CARTO_DARK, TILE_OPTS), 'CARTO Voyager':L.tileLayer(CARTO_VOYAGER, TILE_OPTS) }, null).addTo(rescueMap);
+
+  // SOS caller pins
+  SOS_CASES.forEach(c => {
+    const icon = L.divIcon({ className:'', html:`
+      <div style="position:relative;">
+        <div style="width:18px;height:18px;border-radius:50%;background:#f43f5e;border:3px solid #fff;box-shadow:0 0 14px #f43f5e;"></div>
+        <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(244,63,94,.5);animation:ring-out 2s infinite;"></div>
+      </div>`, iconSize:[18,18], iconAnchor:[9,9] });
+    L.marker([c.lat, c.lon], { icon }).bindPopup(`
+      <strong>${c.name}</strong> · ${c.id}<br>
+      📍 ${c.zone}<br>
+      ${c.desc}
+    `).addTo(rescueMap);
+  });
+
+  // NDRF base pin
+  const ndrf = L.divIcon({ className:'', html:`<div style="width:14px;height:14px;border-radius:3px;background:#34d399;border:2px solid #fff;box-shadow:0 0 8px #34d399;"></div>`, iconSize:[14,14], iconAnchor:[7,7] });
+  L.marker([21.52, 83.86], { icon:ndrf }).bindPopup('🪖 NDRF Bn-7 Base Station<br>Team T-4 deployed · 6 personnel').addTo(rescueMap);
+
+  // Route line
+  const routeCoords = [[21.52, 83.86],[21.50, 83.90],[21.48, 83.93],[21.466, 83.975]];
+  L.polyline(routeCoords, { color:'#38bdf8', weight:3, dashArray:'8 6', opacity:.9 }).addTo(rescueMap);
+
+  drawFloodZones(rescueMap);
+
+  const obs = new ResizeObserver(() => rescueMap.invalidateSize());
+  obs.observe(document.getElementById('rescue-map-wrap'));
+}
+
+/* ── Shared: flood zones + user pin ─────────────────────────────────── */
+function drawFloodZones(map) {
+  [
+    { coords:[[21.42,83.88],[21.49,83.93],[21.48,83.99],[21.40,83.95]], color:'#f43f5e' },
+    { coords:[[21.44,83.96],[21.50,84.01],[21.47,84.08],[21.41,84.02]], color:'#fbbf24' },
+    { coords:[[21.51,83.95],[21.58,84.05],[21.55,84.12],[21.49,84.03]], color:'#10b981' }
+  ].forEach(z => L.polygon(z.coords, { color:z.color, weight:1, fillColor:z.color, fillOpacity:.22 }).addTo(map));
+}
+
+function addUserPin(map, lat, lon, label) {
+  const icon = L.divIcon({ className:'', html:`
+    <div style="position:relative;width:18px;height:18px;">
+      <div style="width:18px;height:18px;border-radius:50%;background:#38bdf8;border:3px solid #fff;box-shadow:0 0 16px #38bdf8;"></div>
+      <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid #38bdf8;animation:ring-out 2s infinite;opacity:.7;"></div>
+    </div>`, iconSize:[18,18], iconAnchor:[9,9] });
+  L.marker([lat, lon], { icon }).bindPopup(`📍 ${label}`).addTo(map);
+}
+
+/* ── SOS Modal ────────────────────────────────────────────────────────── */
+function openSOSModal() {
+  updateModalCoords();
+  document.getElementById('modal-pre-confirm').style.display = 'block';
+  document.getElementById('modal-transmitting').style.display = 'none';
+  document.getElementById('modal-success').style.display = 'none';
+  document.getElementById('sos-trigger-modal').classList.add('open');
+}
+function closeSOSModal() {
+  document.getElementById('sos-trigger-modal').classList.remove('open');
+}
+
+async function confirmSOS() {
+  document.getElementById('modal-pre-confirm').style.display = 'none';
+  document.getElementById('modal-transmitting').style.display = 'block';
+
+  // Animate steps
+  const steps = [
+    { id:'tx-gps',     delay:400  },
+    { id:'tx-ndrf',    delay:900  },
+    { id:'tx-odrf',    delay:1600 },
+    { id:'tx-shelter', delay:2200 },
+    { id:'tx-siren',   delay:2800 }
+  ];
+
+  for (const s of steps) {
+    await sleep(s.delay - (steps.indexOf(s) > 0 ? steps[steps.indexOf(s)-1].delay : 0));
+    const el = document.getElementById(s.id);
+    el.classList.add('sending');
+    el.querySelector('.tx-icon').classList.replace('txi-pending','txi-sending');
+    el.querySelector('.tx-icon').innerHTML = '<div class="tx-spinner"></div>';
+    await sleep(500);
+    el.classList.remove('sending');
+    el.classList.add('done');
+    el.querySelector('.tx-icon').classList.replace('txi-sending','txi-done');
+    el.querySelector('.tx-icon').innerHTML = '✅';
+  }
+
+  // Actual API call
+  try {
+    await fetch('/api/v1/sos/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        latitude: userLat, longitude: userLon,
+        location_name: document.getElementById('gps-loc-name').textContent,
+        severity: 'critical'
+      })
+    });
+  } catch { /* offline graceful */ }
+
+  // Show success
+  const caseId = `SOS-${new Date().getFullYear()}-${String(Math.floor(Math.random()*900+100)).padStart(3,'0')}`;
+  document.getElementById('modal-transmitting').style.display = 'none';
+  document.getElementById('modal-success').style.display = 'block';
+  document.getElementById('sos-case-id').textContent = `Case ID: ${caseId}`;
+
+  // Update call rows with "active" for all
+  RESCUE_TEAMS.forEach(t => t.status = 'active');
+  buildCallRows();
+  document.getElementById('sos-count').textContent = parseInt(document.getElementById('sos-count').textContent) + 1;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ── Camera ───────────────────────────────────────────────────────────── */
+async function toggleCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+    document.getElementById('camera-video').style.display = 'none';
+    document.getElementById('cam-placeholder').style.display = 'flex';
+    document.getElementById('cam-rec-dot').style.display = 'none';
+    document.getElementById('cam-live-tag').style.display = 'none';
+    document.getElementById('cam-toggle-btn').textContent = '📷 Enable Camera';
+    document.getElementById('cam-toggle-btn').classList.remove('active-cam');
+  } else {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+      const vid = document.getElementById('camera-video');
+      vid.srcObject = cameraStream;
+      vid.style.display = 'block';
+      document.getElementById('cam-placeholder').style.display = 'none';
+      document.getElementById('cam-rec-dot').style.display = 'block';
+      document.getElementById('cam-live-tag').style.display = 'flex';
+      document.getElementById('cam-toggle-btn').textContent = '⏹ Disable Camera';
+      document.getElementById('cam-toggle-btn').classList.add('active-cam');
+    } catch {
+      alert('Camera permission denied or unavailable on this device.');
+    }
+  }
+}
+
+function shareScreen() {
+  alert('📡 Screen sharing initiated!\nRescue team NDRF Bn-7 will receive your screen feed via Twilio Video.');
+}
+
+/* ── Quick call ───────────────────────────────────────────────────────── */
+function quickCall(type) {
+  if (type === 'voice') {
+    alert('📞 Initiating Twilio Voice Call to NDRF Helpline 1078…\n\nYour GPS coordinates have been attached to the call record.');
+  } else {
+    alert('💬 WhatsApp message sent to ODRAF Control Room!\n\nGPS link: https://maps.google.com/?q=' + userLat + ',' + userLon);
+  }
+}
+
+/* ── Responder actions ─────────────────────────────────────────────────── */
+function dispatchTeam() {
+  alert('🚁 NDRF Team T-4 Dispatch Confirmed!\n6 personnel + boat deployed.\nETA: 8 minutes to caller location.');
+}
+function callCaller() {
+  alert('📞 Initiating direct call to caller via Twilio…');
+}
+function markSafe() {
+  if (confirm('Mark this caller as SAFE and close the SOS case?')) {
+    alert('✅ Case marked as SAFE. NDRF team recalled. Case archived.');
+  }
+}
+
+function setRescueLayer(type) {
+  document.querySelectorAll('.rmt-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

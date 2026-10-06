@@ -1,0 +1,62 @@
+﻿# ============================================================
+# FloodGuard AI Platform - Kubernetes Ingress (NGINX + TLS)
+# Step 5: Integration & Scaling
+# ============================================================
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: floodguard-ingress
+  namespace: floodguard
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+    - hosts:
+        - api.floodguard.ai
+        - dashboard.floodguard.ai
+      secretName: floodguard-tls
+  rules:
+    - host: api.floodguard.ai
+      http:
+        paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: floodguard-api-svc
+                port:
+                  number: 80
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: floodguard-api-svc
+                port:
+                  number: 80
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: floodguard-api-svc
+                port:
+                  number: 80
+    - host: dashboard.floodguard.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: floodguard-api-svc
+                port:
+                  number: 80

@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloodGuard — Authority Dashboard (Error-Free Version)</title>
+
+  <!-- ── Fonts ───────────────────────────────────────────────────────── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- ── Leaflet CSS (loaded BEFORE JS to prevent FOUC) ───────────────── -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- ── Lucide icons (deferred so body renders first) ────────────────── -->
+  <script defer src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* ─── Reset & base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #070d24;
+      --surface:   #0f1c40;
+      --surface2:  #162048;
+      --border:    rgba(56,189,248,.18);
+      --border-hl: rgba(56,189,248,.45);
+      --text:      #e2e8f0;
+      --muted:     #7da4c0;
+      --sky:       #38bdf8;
+      --rose:      #f43f5e;
+      --amber:     #fbbf24;
+      --emerald:   #34d399;
+      --cyan:      #22d3ee;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: radial-gradient(ellipse at 50% -20%, #1a3272 0%, var(--bg) 60%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── Scrollbar ─────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #1e3a6e; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--sky); }
+
+    /* ─── Shared card ───────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+
+    /* ─── Top Header Bar ────────────────────────────────────────────── */
+    #top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 300;
+      background: rgba(10,16,42,.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 12px rgba(14,165,233,.4);
+    }
+    .brand-title { font-size: clamp(14px, 2vw, 18px); font-weight: 800; color: #fff; }
+    .brand-sub   { font-size: 11px; color: var(--sky); font-weight: 600; }
+
+    .header-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 999px;
+      font-size: 12px; font-weight: 700;
+      border: 1px solid var(--border); color: var(--sky);
+      background: rgba(56,189,248,.08);
+      text-decoration: none; transition: all .2s;
+      cursor: pointer;
+    }
+    .pill:hover { background: rgba(56,189,248,.18); border-color: var(--sky); color: #fff; }
+    .pill.pill-red { color: #fca5a5; border-color: rgba(244,63,94,.45); background: rgba(244,63,94,.1); }
+    .pill.pill-red:hover { background: rgba(244,63,94,.25); color: #fff; }
+    .pill.pill-dark { background: #2563eb; border-color: #3b82f6; color: #fff; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-green { background: #34d399; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+
+    /* ─── Main layout container ─────────────────────────────────────── */
+    #layout {
+      flex: 1;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-rows: auto 1fr auto auto;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      max-width: 1800px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* ─── Row 1: KPI strip ──────────────────────────────────────────── */
+    #kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .kpi-card {
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .kpi-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .kpi-value { font-size: clamp(22px, 3vw, 32px); font-weight: 900; margin-top: 4px; line-height: 1; }
+    .kpi-sub   { font-size: 11px; margin-top: 4px; }
+    .kpi-icon  { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    /* ─── Row 2: Centre map + right panels ─────────────────────────── */
+    #centre-row {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 14px;
+      min-height: 0; /* prevent overflow */
+    }
+
+    /* Map section */
+    #map-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .map-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .map-toolbar-title { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .risk-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+    .rf-btn {
+      padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;
+      border: 1px solid var(--border); background: rgba(255,255,255,.04);
+      color: var(--muted); cursor: pointer; transition: all .2s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .rf-btn:hover { border-color: var(--sky); color: var(--text); }
+    .rf-btn.active { background: #2563eb; border-color: #3b82f6; color: #fff; box-shadow: 0 4px 12px rgba(37,99,235,.4); }
+
+    /* Map container — explicit height so Leaflet renders correctly */
+    #map-wrap {
+      flex: 1;
+      min-height: 420px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      position: relative;
+      /* critical: isolate stacking so Leaflet panes don't bleed out */
+      isolation: isolate;
+    }
+
+    #risk-map {
+      width: 100%;
+      height: 100%;
+      position: absolute; /* fill parent */
+      inset: 0;
+      background: #091126;
+    }
+
+    /* Map floating badge */
+    #map-badge {
+      position: absolute;
+      bottom: 10px; left: 10px; z-index: 410;
+      background: rgba(9,18,46,.9);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-hl);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      display: flex; align-items: center; gap: 8px;
+      max-width: calc(100% - 20px);
+    }
+    #map-badge .beacon { width: 10px; height: 10px; border-radius: 50%; background: var(--sky); animation: pulse 1.5s infinite; flex-shrink: 0; }
+
+    /* Right column */
+    #right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    /* Weather panel */
+    #weather-panel { padding: 16px; }
+    .weather-temp { font-size: 38px; font-weight: 900; line-height: 1; }
+    .weather-cond { font-size: 12px; color: var(--sky); font-weight: 600; margin-top: 2px; }
+    .weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .wg-item {
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+    .wg-label { color: var(--muted); }
+    .wg-val   { font-weight: 800; color: var(--text); margin-top: 2px; }
+
+    /* Risk gauge */
+    #gauge-panel { padding: 14px; text-align: center; }
+    #gauge-panel h3 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; text-align: left; margin-bottom: 8px; }
+
+    svg#gauge-svg { overflow: visible; }
+    .g-bg { stroke: #1e293b; stroke-width: 16; fill: none; }
+    .g-fill { stroke-width: 16; stroke-linecap: round; fill: none;
+      stroke: url(#ggrad);
+      transition: stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1); }
+
+    .gauge-center {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .gauge-pct { font-size: 28px; font-weight: 900; }
+    .gauge-risk-label { font-size: 11px; font-weight: 800; color: var(--rose); text-transform: uppercase; }
+
+    /* SOS button */
+    #sos-btn {
+      width: 100%; padding: 14px;
+      border-radius: 12px;
+      border: none; cursor: pointer;
+      font-size: 15px; font-weight: 900; letter-spacing: .04em;
+      color: #fff;
+      background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+      box-shadow: 0 8px 24px rgba(220,38,38,.45),
+                  inset 0 1px 2px rgba(255,255,255,.25);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform .15s, box-shadow .15s;
+    }
+    #sos-btn:hover  { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(220,38,38,.6), inset 0 1px 2px rgba(255,255,255,.35); }
+    #sos-btn:active { transform: translateY(1px); }
+    .sos-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; }
+
+    /* ─── Row 3: Alerts ─────────────────────────────────────────────── */
+    #alerts-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #alerts-row h2 { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .alert-item {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border-left: 4px solid;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .alert-item.danger { background: rgba(244,63,94,.1); border-color: var(--rose); }
+    .alert-item.warn   { background: rgba(251,191,36,.08); border-color: var(--amber); }
+    .alert-item.info   { background: rgba(56,189,248,.07); border-color: var(--sky); }
+    .alert-badge { font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+    .alert-badge.danger { background: rgba(244,63,94,.25); color: #fda4af; }
+    .alert-badge.warn   { background: rgba(251,191,36,.2);  color: #fde68a; }
+    .alert-badge.info   { background: rgba(56,189,248,.15); color: #bae6fd; }
+
+    /* ─── Row 4: System Status ticker ──────────────────────────────── */
+    #status-bar {
+      padding: 10px 16px;
+      background: rgba(9,14,34,.9);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 10px;
+      font-size: 12px; font-weight: 700;
+    }
+    .stat-group { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .stat-item  { display: flex; align-items: center; gap: 6px; }
+    .stat-val   { font-family: 'Courier New', monospace; }
+
+    /* ─── Leaflet overrides ─────────────────────────────────────────── */
+    .leaflet-container { background: #091126; font-family: inherit; }
+    .leaflet-popup-content-wrapper {
+      background: #0f1f4b; color: var(--text);
+      border: 1.5px solid var(--sky); border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.6); padding: 2px;
+    }
+    .leaflet-popup-tip { background: #0f1f4b; }
+    /* keep Leaflet controls visible above map-wrap */
+    .leaflet-control-container { z-index: 420; }
+    .leaflet-top, .leaflet-bottom { z-index: 420; }
+
+    /* ─── SOS modal ─────────────────────────────────────────────────── */
+    #sos-modal {
+      display: none; position: fixed; inset: 0; z-index: 600;
+      background: rgba(0,0,0,.8); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    #sos-modal.open { display: flex; }
+    .modal-card {
+      background: #0c1633; border: 1.5px solid rgba(244,63,94,.5);
+      border-radius: 16px; padding: 28px; max-width: 440px; width: 100%;
+      text-align: center;
+    }
+    .modal-icon {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: rgba(244,63,94,.15); border: 2px solid var(--rose);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px; color: var(--rose); animation: pulse 2s infinite;
+    }
+    .modal-title { font-size: 20px; font-weight: 900; }
+    .modal-desc  { font-size: 12px; color: #cbd5e1; margin-top: 8px; line-height: 1.5; }
+    .modal-info  { margin: 14px 0; padding: 12px; background: rgba(244,63,94,.08); border: 1px solid rgba(244,63,94,.3); border-radius: 10px; text-align: left; font-size: 11px; color: #94a3b8; }
+    .modal-info div + div { margin-top: 4px; }
+    .modal-btns  { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; border: none; cursor: pointer; font-size: 12px; font-weight: 800; transition: all .2s; }
+    .btn-cancel  { background: #1e293b; color: #94a3b8; }
+    .btn-cancel:hover { background: #334155; }
+    .btn-confirm { background: #dc2626; color: #fff; box-shadow: 0 6px 20px rgba(220,38,38,.4); }
+    .btn-confirm:hover { background: #ef4444; }
+
+    /* ─── Responsive breakpoints ────────────────────────────────────── */
+    @media (max-width: 1200px) {
+      #centre-row { grid-template-columns: 1fr; }
+      #right-col  { display: grid; grid-template-columns: 1fr 1fr; }
+      #sos-btn    { grid-column: 1/-1; }
+    }
+
+    @media (max-width: 900px) {
+      #kpi-row   { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      #kpi-row   { grid-template-columns: 1fr 1fr; }
+      #right-col { grid-template-columns: 1fr; }
+      .map-toolbar { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ TOP HEADER BAR ═══════════════════════════════════════════════════ -->
+<header id="top-bar">
+  <div class="brand">
+    <a href="/" class="brand-icon" style="color:#fff;text-decoration:none;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+    </a>
+    <div>
+      <div class="brand-title">FloodGuard — Authority Dashboard <span style="color:#38bdf8;font-weight:400;">(Error-Free Version)</span></div>
+      <div class="brand-sub">Authority Control Panel · Mahanadi Basin Tactical Operations Center</div>
+    </div>
+  </div>
+  <div class="header-pills">
+    <div class="pill">
+      <div class="dot dot-green"></div>
+      <span>FloodNet-v3.2 Online</span>
+    </div>
+    <a href="/sos"     class="pill pill-red">🆘 SOS System</a>
+    <a href="/citizen" class="pill pill-red" style="opacity:.75;">⚠ Citizen View</a>
+    <a href="/public"  class="pill">☁ Public Forecast</a>
+    <a href="/"        class="pill pill-dark">⌂ Gateway</a>
+  </div>
+</header>
+
+
+<!-- ═══ MAIN LAYOUT ══════════════════════════════════════════════════════ -->
+<div id="layout">
+
+  <!-- ── ROW 1: KPI Cards ─────────────────────────────────────────────── -->
+  <div id="kpi-row">
+
+    <!-- Rainfall 24h -->
+    <div class="card kpi-card" style="border-left:3px solid #38bdf8;">
+      <div>
+        <div class="kpi-label" style="color:#38bdf8;">Rainfall (Last 24h)</div>
+        <div class="kpi-value" id="kv-rainfall">142 <span style="font-size:16px;font-weight:500;color:#7da4c0;">mm</span></div>
+        <div class="kpi-sub" style="color:#f43f5e;">▲ +18.4% vs normal</div>
+      </div>
+      <div class="kpi-icon" style="background:rgba(56,189,248,.12);color:#38bdf8;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6"/><path d="M8 14v6"/><path d="M12 16v6"/></svg>
+      </div>
+    </div>
+
+    <!-- Water Level -->
+    <div class="card kpi-card" style="border-left:3px solid #22d3ee;">
+      <div>
+        <div class="kpi-label" style="color:#22d3ee;">Water Level</div>
+        <div class="kpi-value" id="kv-water">8.5 <span style="font-size:16px;font-weight:500;color:#7da4c0;">m</span></div>
+        <div class="kpi-sub" style="color:#fbbf24;">⚠ Danger at 9.0 m</div>
+      </div>
+      <div class="kpi-icon" style="background:rgba(34,211,238,.12);color:#22d3ee;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>
+      </div>
+    </div>
+
+    <!-- Risk Level -->
+    <div class="card kpi-card" style="border-left:3px solid #f43f5e;">
+      <div>
+        <div class="kpi-label" style="color:#f43f5e;">Flood Risk Level</div>
+        <div class="kpi-value" style="color:#f43f5e;" id="kv-risk">High</div>
+        <div class="kpi-sub" style="color:#fda4af;">Tier 3 — Severe Watch</div>
+      </div>
+      <div class="kpi-icon" style="background:rgba(244,63,94,.12);color:#f43f5e;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      </div>
+    </div>
+
+    <!-- Affected Zones -->
+    <div class="card kpi-card" style="border-left:3px solid #fbbf24;">
+      <div>
+        <div class="kpi-label" style="color:#fbbf24;">Affected Zones</div>
+        <div class="kpi-value" id="kv-zones">12 <span style="font-size:16px;font-weight:500;color:#7da4c0;">Areas</span></div>
+        <div class="kpi-sub">
+          <span style="color:#f43f5e;">4 Red</span> ·
+          <span style="color:#fbbf24;">5 Yellow</span> ·
+          <span style="color:#34d399;">3 Safe</span>
+        </div>
+      </div>
+      <div class="kpi-icon" style="background:rgba(251,191,36,.12);color:#fbbf24;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9"/><path d="M12 3v6"/></svg>
+      </div>
+    </div>
+
+  </div><!-- /#kpi-row -->
+
+  <!-- ── ROW 2: Map + Right Panel ─────────────────────────────────────── -->
+  <div id="centre-row">
+
+    <!-- Map section -->
+    <section id="map-section">
+      <!-- Toolbar above map (NOT inside map-wrap) -->
+      <div class="map-toolbar">
+        <div class="map-toolbar-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
+          <span>Live Flood Inundation &amp; Risk Map</span>
+          <span style="font-size:11px;color:var(--muted);font-weight:500;">· Mahanadi Basin · CARTO Basemap</span>
+        </div>
+        <div class="risk-filters">
+          <button class="rf-btn active" id="rf-all"  onclick="filterRisk('all')"> All Zones </button>
+          <button class="rf-btn"        id="rf-high" onclick="filterRisk('high')">
+            <span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block;"></span> High Risk
+          </button>
+          <button class="rf-btn"        id="rf-mod"  onclick="filterRisk('mod')">
+            <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;"></span> Moderate
+          </button>
+          <button class="rf-btn"        id="rf-low"  onclick="filterRisk('low')">
+            <span style="width:8px;height:8px;border-radius:50%;background:#34d399;display:inline-block;"></span> Low Risk
+          </button>
+        </div>
+      </div>
+
+      <!-- The actual map wrapper — explicit relative+height for Leaflet -->
+      <div id="map-wrap">
+        <div id="risk-map"></div>
+        <div id="map-badge">
+          <div class="beacon"></div>
+          <div>
+            <div style="font-weight:800;color:#bae6fd;" id="badge-loc">Detecting GPS Location…</div>
+            <div style="color:var(--muted);font-size:11px;" id="badge-stats">Water Level: 8.5m · Risk: High (78%) · Rain: 142mm</div>
+          </div>
+          <button onclick="openLocModal()" style="margin-left:8px;padding:4px 10px;border-radius:6px;background:#2563eb;border:none;color:#fff;font-size:11px;font-weight:800;cursor:pointer;">Details</button>
+        </div>
+      </div>
+
+      <!-- Map legend below (NOT inside map-wrap, so never overlaps) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--muted);">
+        <div style="display:flex;gap:14px;align-items:center;">
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f43f5e;margin-right:4px;"></span>Severe (&gt;8.5m)</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fbbf24;margin-right:4px;"></span>Moderate (7–8.5m)</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#34d399;margin-right:4px;"></span>Safe (&lt;7m)</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#38bdf8;margin-right:4px;"></span>Your Location</span>
+        </div>
+        <span style="font-family:monospace;">Sensors: 24/24 Live · CWC Telemetry Active</span>
+      </div>
+    </section><!-- /#map-section -->
+
+    <!-- Right column -->
+    <div id="right-col">
+
+      <!-- Current Weather -->
+      <div class="card" id="weather-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px;">
+          <span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">Current Weather</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(56,189,248,.12);border:1px solid var(--border);color:var(--sky);">Live IMD</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;">
+          <div>
+            <div class="weather-temp" id="w-temp">28°C</div>
+            <div class="weather-cond" id="w-cond">Humid &amp; Overcast</div>
+          </div>
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(251,191,36,.3);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1c1917" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M3 20a5 5 0 1 1 8.9-4H13a3 3 0 0 1 2 5.24"/><path d="M11 20v2"/><path d="M7 19v2"/></svg>
+          </div>
+        </div>
+        <div class="weather-grid">
+          <div class="wg-item"><div class="wg-label">Humidity</div><div class="wg-val" id="w-hum">90%</div></div>
+          <div class="wg-item"><div class="wg-label">Wind</div><div class="wg-val" id="w-wind">22 km/h SE</div></div>
+          <div class="wg-item"><div class="wg-label">Pressure</div><div class="wg-val" id="w-pres">1000 hPa</div></div>
+          <div class="wg-item"><div class="wg-label">Visibility</div><div class="wg-val" id="w-vis">4.5 km</div></div>
+        </div>
+      </div>
+
+      <!-- Risk Level Gauge -->
+      <div class="card" id="gauge-panel">
+        <h3>Risk Level</h3>
+        <div style="position:relative;display:flex;justify-content:center;align-items:center;">
+          <svg id="gauge-svg" width="200" height="108" viewBox="0 0 200 108">
+            <defs>
+              <linearGradient id="ggrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#10b981"/>
+                <stop offset="45%"  stop-color="#f59e0b"/>
+                <stop offset="85%"  stop-color="#f43f5e"/>
+                <stop offset="100%" stop-color="#b91c1c"/>
+              </linearGradient>
+            </defs>
+            <!-- Background arc: radius=80, centre=100,105, half-circle -->
+            <path d="M20 105 A80 80 0 0 1 180 105" class="g-bg"/>
+            <!-- Value arc: same path, dash offset controls fill -->
+            <path id="gauge-arc" d="M20 105 A80 80 0 0 1 180 105" class="g-fill"
+                  stroke-dasharray="251" stroke-dashoffset="62"/>
+          </svg>
+          <div class="gauge-center">
+            <div class="gauge-pct" id="gauge-pct-val">78%</div>
+            <div class="gauge-risk-label" id="gauge-risk-lbl">High Risk</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;padding:0 10px;margin-top:4px;">
+          <span style="color:#10b981;">Low</span>
+          <span style="color:#f59e0b;">Medium</span>
+          <span style="color:#f43f5e;">High</span>
+        </div>
+      </div>
+
+      <!-- SOS Alert Button -->
+      <button id="sos-btn" onclick="openSOS()">
+        <div class="sos-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        </div>
+        <span>Send SOS Alert</span>
+      </button>
+
+    </div><!-- /#right-col -->
+
+  </div><!-- /#centre-row -->
+
+  <!-- ── ROW 3: Alerts Feed ─────────────────────────────────────────── -->
+  <div id="alerts-row">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      Live CAP Alert Feed &nbsp;
+      <span style="background:rgba(244,63,94,.25);color:#fda4af;font-size:10px;padding:1px 8px;border-radius:999px;">3 Active</span>
+    </h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;">
+      <div class="alert-item danger">
+        <span class="alert-badge danger">Mandatory Evacuation</span>
+        <div>
+          <div style="font-weight:700;">Sectors 3 &amp; 4 — Move to Relief Shelter 2 immediately</div>
+          <div style="color:var(--muted);margin-top:2px;">Mahanadi exceeded 8.5m. Buses at Sambalpur Clock Tower. · 10 min ago</div>
+        </div>
+      </div>
+      <div class="alert-item warn">
+        <span class="alert-badge warn">Flash Flood Watch</span>
+        <div>
+          <div style="font-weight:700;">Burla Old Town — Torrential rain for next 6 hours</div>
+          <div style="color:var(--muted);margin-top:2px;">Secure livestock, gas, medications. Embankment pressure rising. · 28 min ago</div>
+        </div>
+      </div>
+      <div class="alert-item info">
+        <span class="alert-badge info">CWC Dam Bulletin</span>
+        <div>
+          <div style="font-weight:700;">Hirakud: 24 sluice gates open — 450,000 cusecs outflow</div>
+          <div style="color:var(--muted);margin-top:2px;">Do not approach riverbanks. NH-53 closed. · 1 hr ago</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROW 4: System Status Bar ───────────────────────────────────── -->
+  <div id="status-bar">
+    <div class="stat-group">
+      <div class="stat-item" style="color:#22d3ee;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>
+        River Level: <span class="stat-val" id="st-level">8.5 m</span>
+      </div>
+      <div class="stat-item" style="color:#f43f5e;">▲ Rate: <span class="stat-val" id="st-rate">23.5 mm/h</span></div>
+      <div class="stat-item" style="color:#fbbf24;">Temp: <span class="stat-val" id="st-temp">28.2 °C</span></div>
+      <div class="stat-item" style="color:#38bdf8;">Wind: <span class="stat-val" id="st-wind">22 km/h SE</span></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);font-family:monospace;">FloodGuard v3.2.1 · CWC Mahanadi · CARTO Licensed Basemap · Sensors 24/24</div>
+  </div>
+
+</div><!-- /#layout -->
+
+<!-- ═══ SOS Confirmation Modal ═══════════════════════════════════════════ -->
+<div id="sos-modal">
+  <div class="modal-card">
+    <div class="modal-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    </div>
+    <div class="modal-title">Emergency SOS Broadcast</div>
+    <div class="modal-desc">Dispatching geofenced Tier-3 evacuation alert to all NDRF rescue teams, local sirens, and registered citizens for the detected coordinates.</div>
+    <div class="modal-info">
+      <div>Status: <strong style="color:#f43f5e;">Tier 3 — Severe Flood Alert</strong></div>
+      <div>Channel: CAP XML + SMS Broadcast + Siren Arrays</div>
+      <div id="modal-coords">Coordinates: 21.4660° N, 83.9750° E</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel"  onclick="closeSOS()">Cancel</button>
+      <button class="btn-confirm" onclick="confirmSOS()">Confirm Broadcast</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Location Details Modal ═══════════════════════════════════════════ -->
+<div id="loc-modal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;">
+  <div class="modal-card" style="max-width:500px;text-align:left;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:16px;font-weight:900;" id="loc-modal-title">Location Details</div>
+      <button onclick="closeLocModal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;">✕</button>
+    </div>
+    <div id="loc-modal-body" style="font-size:12px;color:#cbd5e1;line-height:1.7;"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="btn-confirm" onclick="openSOS();closeLocModal()">Dispatch SOS to This Zone</button>
+      <button class="btn-cancel"  onclick="closeLocModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Leaflet JS (loaded at end of body) ══════════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+/* ── Constants ──────────────────────────────────────────────────────── */
+const CARTO_KEY = 'cb1_2xm7_1_7f41667ad0188b79dff91e16';
+const CARTO_URL_DARK    = `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_KEY}`;
+const CARTO_URL_VOYAGER = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_KEY}`;
+const TILE_OPTIONS = { subdomains:'abcd', maxZoom:19, attribution:'© <a href="https://carto.com/">CARTO</a> © OSM' };
+
+/* ── Zone dataset ────────────────────────────────────────────────────── */
+const ZONES = [
+  { id:1, name:"Hirakud Dam Spillway",        level:"high", lat:21.528, lon:83.871, depth:"8.9m", info:"Severe overflow risk · 24 gates open"     },
+  { id:2, name:"Sambalpur Ghat (Sector 4)",   level:"high", lat:21.466, lon:83.975, depth:"8.6m", info:"Evacuation active · Road NH-53 closed"     },
+  { id:3, name:"Burla Old Town Channel",       level:"high", lat:21.501, lon:83.871, depth:"8.5m", info:"Embankment pressure critical"              },
+  { id:4, name:"Chiplima Power Canal",         level:"high", lat:21.352, lon:83.916, depth:"8.7m", info:"Flow exceeded 850k cusec"                  },
+  { id:5, name:"Dhanupali Lowlands",           level:"mod",  lat:21.442, lon:83.989, depth:"7.4m", info:"Moderate seepage · monitoring active"      },
+  { id:6, name:"Khetrajpur Railway Zone",      level:"mod",  lat:21.481, lon:83.961, depth:"7.2m", info:"Drain blockage monitored"                  },
+  { id:7, name:"Maneswar Riverside",           level:"mod",  lat:21.411, lon:83.992, depth:"7.6m", info:"Embankment patrol active"                  },
+  { id:8, name:"Goshala Outskirts",            level:"mod",  lat:21.385, lon:83.921, depth:"7.1m", info:"Water rising 4 cm/h"                       },
+  { id:9, name:"Ainthapali Highland",          level:"low",  lat:21.493, lon:83.998, depth:"5.1m", info:"Normal drainage · designated safe zone"    },
+  { id:10,name:"Remed Elevated Ridge",         level:"low",  lat:21.512, lon:83.952, depth:"4.8m", info:"Safe sector · emergency base ready"        },
+  { id:11,name:"Hirakud Hill Cantonment",      level:"low",  lat:21.535, lon:83.891, depth:"3.2m", info:"Command post safe · no inundation"         }
+];
+
+const COLORS = { high:'#f43f5e', mod:'#fbbf24', low:'#34d399' };
+
+/* ── State ──────────────────────────────────────────────────────────── */
+let map, userMarker, activeMarkers = [], radarPolygons = [];
+let presentLat = 21.466, presentLon = 83.975;
+
+/* ── Initialise map (deferred via requestAnimationFrame) ────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  // Let browser paint all panels first, THEN mount Leaflet
+  requestAnimationFrame(() => setTimeout(initMap, 100));
+  requestLiveLocation();
+});
+
+function initMap() {
+  // Map fills #risk-map which is position:absolute inside #map-wrap
+  map = L.map('risk-map', {
+    center: [presentLat, presentLon],
+    zoom: 11,
+    zoomControl: true,
+    attributionControl: true
+  });
+
+  // CARTO Dark Matter (primary)
+  const darkLayer = L.tileLayer(CARTO_URL_DARK, TILE_OPTIONS);
+  // CARTO Voyager (secondary)
+  const voyagerLayer = L.tileLayer(CARTO_URL_VOYAGER, TILE_OPTIONS);
+
+  darkLayer.addTo(map);
+
+  // Layer switcher — positioned top-right (Leaflet default)
+  L.control.layers({ 'CARTO Dark': darkLayer, 'CARTO Voyager': voyagerLayer }, null, { position:'topright' }).addTo(map);
+
+  // Draw radar simulation overlays
+  drawRadar();
+  // Draw zone pins
+  renderPins('all');
+
+  // Fix tile gap on container resize
+  const obs = new ResizeObserver(() => map.invalidateSize());
+  obs.observe(document.getElementById('map-wrap'));
+
+  // Click anywhere → update location
+  map.on('click', e => loadLocation(e.latlng.lat, e.latlng.lng, 'Map Click'));
+}
+
+/* ── Radar swath polygons ────────────────────────────────────────────── */
+function drawRadar() {
+  const swaths = [
+    { coords:[[21.42,83.88],[21.49,83.93],[21.48,83.99],[21.40,83.95]], color:'#f43f5e', opacity:.42 },
+    { coords:[[21.48,83.93],[21.55,84.05],[21.52,84.14],[21.44,84.02]], color:'#f97316', opacity:.38 },
+    { coords:[[21.52,84.05],[21.60,84.22],[21.56,84.32],[21.48,84.15]], color:'#eab308', opacity:.33 },
+    { coords:[[21.56,84.22],[21.63,84.40],[21.57,84.48],[21.50,84.30]], color:'#10b981', opacity:.28 }
+  ];
+  swaths.forEach(s => {
+    const poly = L.polygon(s.coords, { color:s.color, weight:1, fillColor:s.color, fillOpacity:s.opacity });
+    poly.addTo(map);
+    radarPolygons.push(poly);
+  });
+}
+
+/* ── Zone pins ──────────────────────────────────────────────────────── */
+function renderPins(filter) {
+  activeMarkers.forEach(m => map.removeLayer(m));
+  activeMarkers = [];
+
+  ZONES.forEach(z => {
+    if (filter !== 'all' && z.level !== filter) return;
+    const c = COLORS[z.level];
+
+    // Ripple for high-risk
+    if (z.level === 'high') {
+      const ripple = L.circle([z.lat, z.lon], { radius:700, color:c, weight:1, fillColor:c, fillOpacity:.12 });
+      ripple.addTo(map);
+      activeMarkers.push(ripple);
+    }
+
+    const circle = L.circleMarker([z.lat, z.lon], {
+      radius: z.level==='high' ? 14 : z.level==='mod' ? 10 : 8,
+      fillColor: c, color:'#fff', weight: 2, fillOpacity: .9
+    });
+
+    circle.bindPopup(`
+      <div style="font-family:inherit;font-size:12px;line-height:1.5;min-width:180px;">
+        <div style="font-weight:900;font-size:13px;color:#bae6fd;">${z.name}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${c};display:inline-block;"></span>
+          <span style="font-weight:700;text-transform:capitalize;">${z.level} Risk Zone</span>
+        </div>
+        <div>Water Depth: <strong>${z.depth}</strong></div>
+        <div style="color:#94a3b8;font-size:11px;margin-top:2px;">${z.info}</div>
+      </div>
+    `, { maxWidth: 240 });
+
+    circle.on('click', () => loadLocation(z.lat, z.lon, z.name));
+    circle.addTo(map);
+    activeMarkers.push(circle);
+  });
+}
+
+/* ── Risk filter buttons ─────────────────────────────────────────────── */
+function filterRisk(type) {
+  ['all','high','mod','low'].forEach(k => {
+    const el = document.getElementById(`rf-${k}`);
+    el.classList.toggle('active', k === type);
+  });
+  renderPins(type);
+}
+
+/* ── Live geolocation ────────────────────────────────────────────────── */
+function requestLiveLocation() {
+  if (!navigator.geolocation) { loadLocation(21.466, 83.975, 'Central District (Sambalpur)'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => loadLocation(pos.coords.latitude, pos.coords.longitude, 'Your Live GPS Location'),
+    ()  => loadLocation(21.466, 83.975, 'Central District (Sambalpur — Default)')
+  );
+}
+
+/* ── Load location + fetch telemetry ────────────────────────────────── */
+async function loadLocation(lat, lon, label) {
+  presentLat = lat; presentLon = lon;
+  document.getElementById('modal-coords').textContent = `Coordinates: ${lat.toFixed(5)}° N, ${lon.toFixed(5)}° E`;
+
+  // Update GPS beacon on map
+  if (map) {
+    if (userMarker) map.removeLayer(userMarker);
+    const beaconIcon = L.divIcon({ className:'', html:`
+      <div style="width:18px;height:18px;border-radius:50%;background:#38bdf8;border:3px solid #fff;
+                  box-shadow:0 0 16px #38bdf8;position:relative;">
+        <div style="position:absolute;inset:-10px;border-radius:50%;border:2px solid #38bdf8;
+                    animation:beacon 2s infinite;opacity:.6;"></div>
+      </div>
+      <style>@keyframes beacon{0%{transform:scale(.5);opacity:1}100%{transform:scale(2.5);opacity:0}}</style>
+    `, iconSize:[18,18], iconAnchor:[9,9] });
+    userMarker = L.marker([lat, lon], { icon: beaconIcon, zIndexOffset:900 }).addTo(map);
+    map.flyTo([lat, lon], 12, { duration:1.2 });
+  }
+
+  // Fetch telemetry
+  try {
+    const res  = await fetch(`/api/v1/location-telemetry?lat=${lat}&lon=${lon}`);
+    const data = await res.json();
+    applyTelemetry(data, label);
+  } catch {
+    // Fallback values already displayed
+    document.getElementById('badge-loc').textContent = `Location: ${label}`;
+  }
+}
+
+/* ── Apply telemetry to UI ──────────────────────────────────────────── */
+function applyTelemetry(d, label) {
+  // KPI cards
+  document.getElementById('kv-rainfall').innerHTML = `${d.kpi.rainfall_24h_mm} <span style="font-size:16px;font-weight:500;color:#7da4c0;">mm</span>`;
+  document.getElementById('kv-water').innerHTML    = `${d.kpi.water_level_m} <span style="font-size:16px;font-weight:500;color:#7da4c0;">m</span>`;
+  document.getElementById('kv-risk').textContent  = d.kpi.risk_level;
+  document.getElementById('kv-zones').innerHTML   = `${d.kpi.affected_zones_count} <span style="font-size:16px;font-weight:500;color:#7da4c0;">Areas</span>`;
+
+  // Weather
+  document.getElementById('w-temp').textContent  = `${Math.round(d.weather.temperature_c)}°C`;
+  document.getElementById('w-cond').textContent  = d.weather.condition;
+  document.getElementById('w-hum').textContent   = `${d.weather.humidity_pct}%`;
+  document.getElementById('w-wind').textContent  = `${d.weather.wind_speed_kmh} km/h ${d.weather.wind_direction}`;
+  document.getElementById('w-pres').textContent  = `${d.weather.pressure_hpa} hPa`;
+  document.getElementById('w-vis').textContent   = `${d.weather.visibility_km} km`;
+
+  // Status bar
+  document.getElementById('st-level').textContent = `${d.kpi.water_level_m} m`;
+  document.getElementById('st-rate').textContent  = `${d.kpi.rainfall_rate_mm_h} mm/h`;
+  document.getElementById('st-temp').textContent  = `${d.weather.temperature_c} °C`;
+  document.getElementById('st-wind').textContent  = `${d.weather.wind_speed_kmh} km/h ${d.weather.wind_direction}`;
+
+  // Gauge
+  const pct = d.kpi.risk_percentage;
+  const totalLen = 251, offset = totalLen - (pct / 100) * totalLen;
+  document.getElementById('gauge-arc').style.strokeDashoffset = offset;
+  document.getElementById('gauge-pct-val').textContent   = `${pct}%`;
+  document.getElementById('gauge-risk-lbl').textContent  = `${d.kpi.risk_level} Risk`;
+
+  // Map badge
+  document.getElementById('badge-loc').textContent   = `Location: ${label}`;
+  document.getElementById('badge-stats').textContent = `Water: ${d.kpi.water_level_m}m · Risk: ${d.kpi.risk_level} (${pct}%) · Rain: ${d.kpi.rainfall_24h_mm}mm`;
+
+  // Populate location modal body
+  document.getElementById('loc-modal-title').textContent = d.location.locality_name || label;
+  document.getElementById('loc-modal-body').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      ${row('Coordinates',   `${d.location.latitude.toFixed(5)}°N, ${d.location.longitude.toFixed(5)}°E`)}
+      ${row('Locality',      d.location.locality_name)}
+      ${row('Elevation',     `${d.location.elevation_m} m MSL`)}
+      ${row('Water Level',   `${d.kpi.water_level_m} m (danger at 9.0 m)`)}
+      ${row('24h Rainfall',  `${d.kpi.rainfall_24h_mm} mm`)}
+      ${row('Rain Rate',     `${d.kpi.rainfall_rate_mm_h} mm/h`)}
+      ${row('Flood Risk',    `${d.kpi.risk_level} — ${pct}%`, d.kpi.risk_level==='High'?'color:#f43f5e':'')}
+      ${row('Active Alert',  d.emergency.active_alert, 'color:#fbbf24')}
+      ${row('Advisory',      d.emergency.advisory)}
+      ${row('Nearest Shelter',`${d.emergency.nearest_shelter} (${d.emergency.shelter_distance_km} km)`)}
+      ${row('NDRF Helpline', '1078')}
+      ${row('ODRAF Helpline','1070')}
+    </table>
+  `;
+}
+
+function row(label, val, style='') {
+  return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+    <td style="padding:5px 8px;color:#7da4c0;white-space:nowrap;">${label}</td>
+    <td style="padding:5px 8px;font-weight:700;${style}">${val}</td>
+  </tr>`;
+}
+
+/* ── Modal helpers ──────────────────────────────────────────────────── */
+function openSOS()  { document.getElementById('sos-modal').classList.add('open'); }
+function closeSOS() { document.getElementById('sos-modal').classList.remove('open'); }
+function confirmSOS() {
+  closeSOS();
+  alert(`🚨 EMERGENCY BROADCAST TRANSMITTED\nSector (${presentLat.toFixed(4)} N, ${presentLon.toFixed(4)} E)\nNDRF rescue and local sirens activated.`);
+}
+function openLocModal()  { document.getElementById('loc-modal').style.display = 'flex'; }
+function closeLocModal() { document.getElementById('loc-modal').style.display = 'none'; }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,189 @@
+﻿# ============================================================
+# FloodGuard AI Platform - Kubernetes Deployment Manifests
+# Step 5: Integration & Scaling
+# kubectl apply -f k8s/deployment.yaml
+# ============================================================
+
+---
+# FloodGuard Main API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floodguard-api
+  namespace: floodguard
+  labels:
+    app: floodguard-api
+    version: "1.0.0"
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: floodguard-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0%
+  template:
+    metadata:
+      labels:
+        app: floodguard-api
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: floodguard-api
+          image: ghcr.io/floodguard-ai/floodguard:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: floodguard-config
+                  key: ENVIRONMENT
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: floodguard-secrets
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: floodguard-secrets
+                  key: TWILIO_API_KEY
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: floodguard-secrets
+                  key: TWILIO_API_SECRET
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+
+---
+# FloodGuard Forecast Engine Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floodguard-forecast
+  namespace: floodguard
+  labels:
+    app: floodguard-forecast
+    component: forecast
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: floodguard-forecast
+  template:
+    metadata:
+      labels:
+        app: floodguard-forecast
+    spec:
+      containers:
+        - name: floodguard-forecast
+          image: ghcr.io/floodguard-ai/floodguard:latest
+          ports:
+            - containerPort: 8001
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+
+---
+# FloodGuard Alert Dispatcher Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floodguard-alerts
+  namespace: floodguard
+  labels:
+    app: floodguard-alerts
+    component: alerts
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: floodguard-alerts
+  template:
+    metadata:
+      labels:
+        app: floodguard-alerts
+    spec:
+      containers:
+        - name: floodguard-alerts
+          image: ghcr.io/floodguard-ai/floodguard:latest
+          ports:
+            - containerPort: 8002
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+---
+# FloodGuard Dashboard Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floodguard-dashboard
+  namespace: floodguard
+  labels:
+    app: floodguard-dashboard
+    component: dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: floodguard-dashboard
+  template:
+    metadata:
+      labels:
+        app: floodguard-dashboard
+    spec:
+      containers:
+        - name: floodguard-dashboard
+          image: ghcr.io/floodguard-ai/floodguard:latest
+          ports:
+            - containerPort: 8003
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

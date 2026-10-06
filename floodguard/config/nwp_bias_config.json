@@ -1,0 +1,37 @@
+{
+  "version": "2.4.0",
+  "updated_at": "2026-09-04T00:00:00Z",
+  "basin": "Mahanadi-Hirakud Catchment Basin",
+  "nwp_providers": {
+    "ECMWF_IFS": {
+      "bias_factor": 1.08,
+      "residual_mean_error_mm": 2.3,
+      "convective_underestimation_ratio": 1.22,
+      "orographic_boost": 1.15
+    },
+    "NOAA_GFS": {
+      "bias_factor": 0.94,
+      "residual_mean_error_mm": -3.1,
+      "convective_underestimation_ratio": 1.18,
+      "orographic_boost": 1.10
+    },
+    "NCMRWF_UM": {
+      "bias_factor": 1.03,
+      "residual_mean_error_mm": 0.8,
+      "convective_underestimation_ratio": 1.14,
+      "orographic_boost": 1.12
+    }
+  },
+  "elevation_lapse_rate_mm_per_100m": 0.45,
+  "monsoon_seasonal_multipliers": {
+    "pre_monsoon": 0.85,
+    "southwest_monsoon": 1.35,
+    "post_monsoon": 1.10,
+    "winter": 0.60
+  },
+  "kalman_filter_state": {
+    "process_noise_q": 0.015,
+    "measurement_noise_r": 0.045,
+    "error_covariance_p": 0.08
+  }
+}

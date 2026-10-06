@@ -1,0 +1,92 @@
+{
+  "__inputs": [],
+  "__requires": [
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0"},
+    {"type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0"}
+  ],
+  "annotations": {"list": []},
+  "description": "FloodGuard AI Platform — Step 5: Integration & Scaling Observability Dashboard",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]}},
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background"},
+      "title": "Total HTTP Requests",
+      "type": "stat",
+      "targets": [{"expr": "sum(floodguard_http_requests_total)", "legendFormat": "Total Requests", "refId": "A"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "id": 2,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+      "title": "P99 Request Latency",
+      "type": "stat",
+      "targets": [{"expr": "histogram_quantile(0.99, sum(rate(floodguard_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P99 Latency", "refId": "A"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "id": 3,
+      "title": "Active Connections",
+      "type": "stat",
+      "targets": [{"expr": "floodguard_active_connections", "legendFormat": "Active", "refId": "A"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 4,
+      "title": "Request Rate by Endpoint (req/s)",
+      "type": "timeseries",
+      "targets": [{"expr": "sum(rate(floodguard_http_requests_total[5m])) by (endpoint)", "legendFormat": "{{endpoint}}", "refId": "A"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 5,
+      "title": "HTTP Request Latency Heatmap",
+      "type": "heatmap",
+      "targets": [{"expr": "sum(rate(floodguard_http_request_duration_seconds_bucket[5m])) by (le)", "legendFormat": "{{le}}", "refId": "A"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 12},
+      "id": 6,
+      "title": "Error Rate by Status Code",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "sum(rate(floodguard_http_requests_total{status_code=~\"4..\"}[5m]))", "legendFormat": "4xx Errors", "refId": "A"},
+        {"expr": "sum(rate(floodguard_http_requests_total{status_code=~\"5..\"}[5m]))", "legendFormat": "5xx Errors", "refId": "B"}
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["floodguard", "flood", "ai", "platform"],
+  "templating": {
+    "list": [
+      {"current": {}, "hide": 0, "includeAll": false, "label": "Datasource", "name": "DS_PROMETHEUS", "options": [], "query": "prometheus", "refresh": 1, "type": "datasource"}
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FloodGuard AI Platform — Step 5: Observability",
+  "uid": "floodguard-step5",
+  "version": 1
+}

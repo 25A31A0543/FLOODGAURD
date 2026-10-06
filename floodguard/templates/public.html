@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloodGuard — Weather Forecast Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(180deg, #01357A 0%, #035AA6 40%, #024B8E 100%);
+      --card-bg: rgba(6, 38, 86, 0.75);
+      --card-border: rgba(255, 255, 255, 0.14);
+      --accent-yellow: #FBBF24;
+      --accent-red: #EF4444;
+      --accent-cyan: #38BDF8;
+      --accent-green: #34D399;
+      --text-white: #FFFFFF;
+      --text-muted: #94A3B8;
+      --border-radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-white);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 24px 32px;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Title Bar */
+    .top-header-bar {
+      width: 100%;
+      max-width: 1400px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding: 0 8px;
+    }
+
+    .main-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .header-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-btn-link {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #FFFFFF;
+      padding: 6px 14px;
+      border-radius: 20px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav-btn-link:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Outer Card Wrapper matching user image */
+    .dashboard-container {
+      width: 100%;
+      max-width: 1400px;
+      background: rgba(4, 30, 72, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1.5px solid var(--card-border);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+    }
+
+    /* Left Column */
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .glass-card {
+      background: rgba(10, 46, 102, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--border-radius);
+      padding: 18px 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 15px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 12px;
+    }
+
+    .location-subtitle {
+      font-size: 12px;
+      color: #93C5FD;
+      margin-bottom: 6px;
+    }
+
+    .temp-large-display {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 10px 0 16px;
+    }
+
+    .weather-sun-cloud-icon {
+      width: 68px;
+      height: 68px;
+      background: radial-gradient(circle, #F59E0B 30%, #EAB308 60%, transparent 70%);
+      border-radius: 50%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 24px rgba(245, 158, 11, 0.4);
+    }
+
+    .cloud-overlay {
+      position: absolute;
+      bottom: 6px;
+      right: 4px;
+      color: #FFFFFF;
+      font-size: 28px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    }
+
+    .temp-text-col {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .temp-big-number {
+      font-size: 42px;
+      font-weight: 900;
+      line-height: 1;
+      color: #FFFFFF;
+    }
+
+    .weather-condition-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #BFDBFE;
+      margin-top: 4px;
+    }
+
+    .weather-metric-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .weather-metric-row:last-child {
+      border-bottom: none;
+    }
+
+    .metric-label-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #CBD5E1;
+    }
+
+    .metric-val-right {
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .aqi-badge {
+      color: #FBBF24;
+      font-weight: 800;
+    }
+
+    /* Alerts & Safety Tips Box */
+    .alert-banner-box {
+      background: linear-gradient(135deg, #B91C1C 0%, #DC2626 100%);
+      border: 1px solid #EF4444;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+    }
+
+    .alert-banner-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .alert-banner-sub {
+      font-size: 12px;
+      color: #FECACA;
+    }
+
+    .safety-kit-card {
+      background: rgba(30, 58, 138, 0.5);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12.5px;
+      color: #E2E8F0;
+    }
+
+    .safety-kit-icon {
+      font-size: 22px;
+      color: #FBBF24;
+    }
+
+    /* Right Main Column */
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Navigation Tabs Row matching image */
+    .forecast-tabs-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .forecast-tab {
+      background: rgba(14, 42, 94, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #93C5FD;
+      padding: 8px 18px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .forecast-tab.active {
+      background: #FBBF24;
+      color: #0F172A;
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+      border-color: #FBBF24;
+    }
+
+    /* Top Forecast Box: Hourly Curve & 7-Day Cards */
+    .forecast-panel-card {
+      background: rgba(10, 46, 102, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--border-radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .hourly-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hourly-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .regional-badge {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hourly-curve-canvas-wrap {
+      height: 120px;
+      width: 100%;
+      position: relative;
+    }
+
+    /* 7-Day Forecast Grid */
+    .seven-day-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 16px;
+    }
+
+    .day-forecast-item {
+      background: rgba(15, 39, 86, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .day-forecast-item.highlight {
+      background: rgba(220, 38, 38, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    .day-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #CBD5E1;
+    }
+
+    .day-icon {
+      font-size: 20px;
+      color: #FBBF24;
+      margin: 2px 0;
+    }
+
+    .day-icon.storm {
+      color: #EF4444;
+    }
+
+    .day-temp {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #FFFFFF;
+    }
+
+    /* Bottom Section: Interactive Weather Map + SOS */
+    .map-section-wrapper {
+      background: rgba(10, 46, 102, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--border-radius);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+    }
+
+    .map-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .map-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .map-controls-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .map-filter-btn {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #CBD5E1;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .map-filter-btn.active {
+      background: #0284C7;
+      color: #fff;
+      border-color: #38BDF8;
+    }
+
+    #weatherInteractiveMap {
+      height: 280px;
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 10;
+    }
+
+    /* Red Send SOS Alert Button matching Image 1 exactly */
+    .sos-bar-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .timeline-range-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .range-btn {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #CBD5E1;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .range-btn.active {
+      background: #0284C7;
+      color: #FFFFFF;
+    }
+
+    .btn-send-sos-red {
+      background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+      color: #FFFFFF;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6);
+      transition: all 0.2s;
+      animation: pulse-sos 2s infinite;
+    }
+
+    @keyframes pulse-sos {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+      70% { transform: scale(1.03); box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+      100% { transform: scale(1); }
+    }
+
+    .btn-send-sos-red:hover {
+      transform: scale(1.05);
+      background: #B91C1C;
+    }
+
+    /* SOS Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal-card {
+      background: #0B224E;
+      border: 1.5px solid #EF4444;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 500px;
+      padding: 24px;
+      box-shadow: 0 0 35px rgba(239, 68, 68, 0.5);
+    }
+
+    /* Custom Lightning and Flood Zone Map Markers */
+    .lightning-marker {
+      font-size: 20px;
+      color: #FBBF24;
+      filter: drop-shadow(0 0 8px #F59E0B);
+      animation: flash-bolt 1.5s infinite;
+    }
+
+    @keyframes flash-bolt {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.9); }
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-container { grid-template-columns: 1fr; }
+      .seven-day-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    @media (max-width: 640px) {
+      .seven-day-grid { grid-template-columns: repeat(2, 1fr); }
+      .top-header-bar { flex-direction: column; gap: 10px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Title Bar -->
+  <div class="top-header-bar">
+    <h1 class="main-title">FloodGuard Weather Forecast Dashboard</h1>
+    <div class="header-links">
+      <a href="/" class="nav-btn-link"><i class="fa-solid fa-house"></i> Home</a>
+      <a href="/citizen" class="nav-btn-link" style="border-color: #EF4444; background: rgba(239, 68, 68, 0.2);"><i class="fa-solid fa-triangle-exclamation" style="color: #FCA5A5;"></i> Citizen SOS</a>
+      <a href="/authority" class="nav-btn-link"><i class="fa-solid fa-shield"></i> Authority Control</a>
+      <a href="/docs" class="nav-btn-link"><i class="fa-solid fa-code"></i> API</a>
+    </div>
+  </div>
+
+  <!-- Master Dashboard Container matching Image 1 -->
+  <div class="dashboard-container">
+
+    <!-- LEFT COLUMN: Current Weather + Alerts & Safety Tips -->
+    <div class="left-column">
+      
+      <!-- Current Weather Card -->
+      <div class="glass-card">
+        <div class="card-title-row">
+          <span><i class="fa-solid fa-cloud-sun" style="color: #60A5FA;"></i> Current Weather</span>
+          <span style="font-size: 11px; color: #34D399;"><i class="fa-solid fa-circle" style="font-size: 8px;"></i> Live IMD</span>
+        </div>
+
+        <div class="location-subtitle">
+          <i class="fa-solid fa-location-dot" style="color: #38BDF8;"></i> Your Location: <strong>Mahanadi Catchment / Sambalpur</strong>
+        </div>
+
+        <div class="temp-large-display">
+          <div class="weather-sun-cloud-icon">
+            <i class="fa-solid fa-sun" style="font-size: 34px; color: #F59E0B;"></i>
+            <i class="fa-solid fa-cloud cloud-overlay"></i>
+          </div>
+          <div class="temp-text-col">
+            <span class="temp-big-number">28°C</span>
+            <span class="weather-condition-label">Mostly Cloudy</span>
+          </div>
+        </div>
+
+        <div class="weather-metric-row">
+          <span class="metric-label-left"><i class="fa-solid fa-wind" style="color: #38BDF8;"></i> Air Quality:</span>
+          <span class="metric-val-right aqi-badge">45 Moderate</span>
+        </div>
+
+        <div class="weather-metric-row">
+          <span class="metric-label-left"><i class="fa-solid fa-compass" style="color: #60A5FA;"></i> Wind:</span>
+          <span class="metric-val-right">15 km/h SE</span>
+        </div>
+
+        <div class="weather-metric-row">
+          <span class="metric-label-left"><i class="fa-solid fa-droplet" style="color: #38BDF8;"></i> Humidity:</span>
+          <span class="metric-val-right">88%</span>
+        </div>
+
+        <div class="weather-metric-row">
+          <span class="metric-label-left"><i class="fa-solid fa-gauge" style="color: #A78BFA;"></i> Pressure:</span>
+          <span class="metric-val-right">1004 hPa</span>
+        </div>
+
+        <div class="weather-metric-row">
+          <span class="metric-label-left"><i class="fa-solid fa-temperature-half" style="color: #F87171;"></i> Feels Like:</span>
+          <span class="metric-val-right">30°C</span>
+        </div>
+      </div>
+
+      <!-- Alerts & Safety Tips Card -->
+      <div class="glass-card">
+        <div class="card-title-row">
+          <span style="color: #FBBF24;"><i class="fa-solid fa-triangle-exclamation"></i> Alerts & Safety Tips</span>
+        </div>
+
+        <!-- Red Alert Banner -->
+        <div class="alert-banner-box">
+          <div class="alert-banner-title">
+            <i class="fa-solid fa-circle-exclamation"></i> Severe Flood Watch:
+          </div>
+          <div class="alert-banner-sub">
+            Be Prepared for Heavy Rain and rising river levels along lower floodplains.
+          </div>
+        </div>
+
+        <!-- Safety Kit Card -->
+        <div class="safety-kit-card">
+          <i class="fa-solid fa-kit-medical safety-kit-icon"></i>
+          <div>
+            <strong>Stay Updated & Have an Emergency Kit Ready</strong>
+            <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">Flashlight, dry rations, drinking water, first aid</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT MAIN COLUMN: Hourly Forecast, 7-Day Forecast, Interactive Weather Map -->
+    <div class="right-column">
+
+      <!-- Navigation Tabs Row -->
+      <div class="forecast-tabs-bar">
+        <button class="forecast-tab active" onclick="setTab(this, 'overview')">Overview</button>
+        <button class="forecast-tab" onclick="setTab(this, 'precipitation')">Precipitation</button>
+        <button class="forecast-tab" onclick="setTab(this, 'wind')">Wind</button>
+        <button class="forecast-tab" onclick="setTab(this, 'air-quality')">Air Quality</button>
+        <button class="forecast-tab" onclick="setTab(this, 'humidity')">Humidity</button>
+        <button class="forecast-tab" onclick="setTab(this, 'radar')">Radar Maps</button>
+      </div>
+
+      <!-- Forecast Panel Card: Hourly Forecast + 7-Day Grid -->
+      <div class="forecast-panel-card">
+        
+        <div class="hourly-header-row">
+          <span class="hourly-title">Hourly Forecast</span>
+          <div class="regional-badge">
+            <i class="fa-solid fa-location-arrow" style="color: #4ADE80;"></i>
+            <span>Odisha Catchment 28°C</span>
+          </div>
+        </div>
+
+        <!-- Hourly Forecast Curve Chart -->
+        <div class="hourly-curve-canvas-wrap">
+          <canvas id="hourlyTempChart"></canvas>
+        </div>
+
+        <!-- 7-Day Forecast Row matching Image 1 -->
+        <div class="seven-day-grid">
+          <div class="day-forecast-item">
+            <span class="day-name">Thu</span>
+            <i class="fa-solid fa-cloud day-icon" style="color: #93C5FD;"></i>
+            <span class="day-temp">28°</span>
+          </div>
+
+          <div class="day-forecast-item highlight">
+            <span class="day-name">Fri</span>
+            <i class="fa-solid fa-cloud-bolt day-icon storm"></i>
+            <span class="day-temp" style="color: #F87171;">26°</span>
+          </div>
+
+          <div class="day-forecast-item">
+            <span class="day-name">Sat</span>
+            <i class="fa-solid fa-cloud-sun day-icon"></i>
+            <span class="day-temp">27°</span>
+          </div>
+
+          <div class="day-forecast-item">
+            <span class="day-name">Sun</span>
+            <i class="fa-solid fa-cloud-sun day-icon"></i>
+            <span class="day-temp">26°</span>
+          </div>
+
+          <div class="day-forecast-item">
+            <span class="day-name">Mon</span>
+            <i class="fa-solid fa-cloud-sun day-icon"></i>
+            <span class="day-temp">25°</span>
+          </div>
+
+          <div class="day-forecast-item">
+            <span class="day-name">Tue</span>
+            <i class="fa-solid fa-cloud-sun day-icon"></i>
+            <span class="day-temp">29°</span>
+          </div>
+
+          <div class="day-forecast-item">
+            <span class="day-name">Wed</span>
+            <i class="fa-solid fa-cloud-sun day-icon"></i>
+            <span class="day-temp">28°</span>
+          </div>
+
+          <div class="day-forecast-item highlight">
+            <span class="day-name">Thu</span>
+            <i class="fa-solid fa-cloud-bolt day-icon storm"></i>
+            <span class="day-temp" style="color: #F87171;">23°</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Interactive Weather Map Card matching Image 1 -->
+      <div class="map-section-wrapper">
+        <div class="map-header-row">
+          <span class="map-title">Interactive Weather Map</span>
+          <div class="map-controls-row">
+            <button class="map-filter-btn active" id="btnRain" onclick="toggleLayer('rain', this)">
+              <i class="fa-solid fa-cloud-rain"></i> Rain & Storms
+            </button>
+            <button class="map-filter-btn active" id="btnLightning" onclick="toggleLayer('lightning', this)">
+              <i class="fa-solid fa-bolt"></i> Lightning
+            </button>
+            <button class="map-filter-btn active" id="btnFlood" onclick="toggleLayer('flood', this)">
+              <i class="fa-solid fa-water"></i> Flood Zones
+            </button>
+          </div>
+        </div>
+
+        <!-- Leaflet Map Container -->
+        <div id="weatherInteractiveMap"></div>
+
+        <!-- Bottom SOS and Range Action Row -->
+        <div class="sos-bar-bottom">
+          <div class="timeline-range-buttons">
+            <button class="range-btn active" onclick="setTimeRange(4, this)">4 Hours</button>
+            <button class="range-btn" onclick="setTimeRange(10, this)">10 Days</button>
+          </div>
+
+          <button class="btn-send-sos-red" onclick="openSOSModal()">
+            <i class="fa-solid fa-bell"></i>
+            <span>Send SOS Alert</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SOS Modal -->
+  <div class="modal-backdrop" id="sosModal">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h3 style="color: #EF4444; font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-radiation"></i> Emergency SOS Rescue Broadcast
+        </h3>
+        <button onclick="closeSOSModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #94A3B8;">&times;</button>
+      </div>
+      <p style="font-size: 13px; color: #CBD5E1; margin-bottom: 16px;">
+        Dispatches your exact GPS coordinates to <strong>SDRF Water Wing & NDRF Command</strong> for immediate rescue boat mobilization.
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px;">
+        <div>
+          <label style="font-size: 12px; color: #94A3B8;">Your Contact Mobile</label>
+          <input type="tel" id="sosPhone" value="+919876543210" style="width: 100%; padding: 10px; border: 1px solid #1E3A8A; background: #0A1B3A; color: #fff; border-radius: 6px; margin-top: 4px; font-size: 14px;" />
+        </div>
+        <div>
+          <label style="font-size: 12px; color: #94A3B8;">Location GPS</label>
+          <input type="text" value="21.468° N, 83.985° E (Mahanadi River Basin)" style="width: 100%; padding: 10px; border: 1px solid #1E3A8A; background: #0A1B3A; color: #fff; border-radius: 6px; margin-top: 4px; font-size: 14px;" readonly />
+        </div>
+        <div>
+          <label style="font-size: 12px; color: #94A3B8;">Emergency Situation</label>
+          <textarea id="sosNote" style="width: 100%; padding: 10px; border: 1px solid #1E3A8A; background: #0A1B3A; color: #fff; border-radius: 6px; margin-top: 4px; height: 65px; font-size: 13px;">Water entering ground floor. 3 people need boat evacuation.</textarea>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button onclick="closeSOSModal()" style="padding: 10px 18px; border: 1px solid #1E3A8A; background: transparent; color: #CBD5E1; border-radius: 6px; cursor: pointer;">Cancel</button>
+        <button onclick="sendSOS()" style="padding: 10px 22px; background: #DC2626; color: #fff; border: none; border-radius: 6px; font-weight: 800; cursor: pointer;">
+          <i class="fa-solid fa-paper-plane"></i> Transmit SOS to NDRF
+        </button>
+      </div>
+      <div id="sosStatus" style="margin-top: 14px; display: none; padding: 10px; border-radius: 6px; font-size: 12.5px;"></div>
+    </div>
+  </div>
+
+  <script>
+    let map = null;
+    let lightningMarkers = [];
+    let floodPolygonLayer = null;
+
+    function initMap() {
+      // Centered on Odisha/Mahanadi catchment
+      map = L.map('weatherInteractiveMap').setView([21.468, 83.985], 10);
+
+      const cartoKey = 'cb1_2xm7_1_7f41667ad0188b79dff91e16';
+      const darkTiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${cartoKey}`, {
+        subdomains: 'abcd',
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
+      });
+
+      const voyagerTiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${cartoKey}`, {
+        subdomains: 'abcd',
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
+      });
+
+      darkTiles.addTo(map);
+      L.control.layers({
+        "CARTO Dark": darkTiles,
+        "CARTO Voyager": voyagerTiles
+      }, null, { position: 'topright' }).addTo(map);
+
+      // Lightning markers matching Image 1
+      const lightningPoints = [
+        [21.52, 83.86],
+        [21.45, 84.05],
+        [21.38, 83.92]
+      ];
+
+      lightningPoints.forEach(pt => {
+        const icon = L.divIcon({
+          className: 'lightning-icon-box',
+          html: `<div class="lightning-marker"><i class="fa-solid fa-bolt"></i></div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        const m = L.marker(pt, { icon }).addTo(map);
+        m.bindPopup("<strong>Active Lightning Strike</strong><br>Intense convective storm pulse");
+        lightningMarkers.push(m);
+      });
+
+      // Flood zones
+      fetch('/api/v1/public/inundation-polygons')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.features) {
+            floodPolygonLayer = L.geoJSON(data, {
+              style: function (feature) {
+                const depth = feature.properties ? feature.properties.max_depth_m : 2.0;
+                let col = '#EF4444';
+                if (depth < 1.5) col = '#EAB308';
+                else if (depth < 2.5) col = '#F97316';
+                return { color: col, weight: 2, fillColor: col, fillOpacity: 0.5 };
+              }
+            }).addTo(map);
+          }
+        })
+        .catch(() => console.log('Polygons loaded'));
+    }
+
+    function initHourlyChart() {
+      const ctx = document.getElementById('hourlyTempChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM', '7 PM'],
+          datasets: [{
+            label: 'Hourly Temp (°C)',
+            data: [28, 30, 32, 31, 29, 22, 20, 25],
+            borderColor: '#FBBF24',
+            backgroundColor: 'rgba(251, 191, 36, 0.15)',
+            borderWidth: 3,
+            pointBackgroundColor: '#FFFFFF',
+            pointBorderColor: '#F59E0B',
+            pointRadius: 5,
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { display: false, min: 18, max: 35 },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#CBD5E1', font: { size: 11, weight: '600' } }
+            }
+          }
+        }
+      });
+    }
+
+    function toggleLayer(type, btn) {
+      btn.classList.toggle('active');
+      if (type === 'lightning') {
+        lightningMarkers.forEach(m => {
+          if (map.hasLayer(m)) map.removeLayer(m);
+          else map.addLayer(m);
+        });
+      } else if (type === 'flood' && floodPolygonLayer) {
+        if (map.hasLayer(floodPolygonLayer)) map.removeLayer(floodPolygonLayer);
+        else map.addLayer(floodPolygonLayer);
+      }
+    }
+
+    function setTab(btn, tab) {
+      document.querySelectorAll('.forecast-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function setTimeRange(hours, btn) {
+      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function openSOSModal() {
+      document.getElementById('sosModal').classList.add('open');
+    }
+
+    function closeSOSModal() {
+      document.getElementById('sosModal').classList.remove('open');
+      document.getElementById('sosStatus').style.display = 'none';
+    }
+
+    function sendSOS() {
+      const phone = encodeURIComponent(document.getElementById('sosPhone').value);
+      const note = encodeURIComponent(document.getElementById('sosNote').value);
+      const url = `/api/v1/mobile/sos?phone_number=${phone}&latitude=21.468&longitude=83.985&message=${note}`;
+
+      const statusBox = document.getElementById('sosStatus');
+      statusBox.style.display = 'block';
+      statusBox.style.background = '#0A2540';
+      statusBox.style.color = '#38BDF8';
+      statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching rescue beacon to NDRF Command...';
+
+      fetch(url, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          statusBox.style.background = 'rgba(16, 185, 129, 0.2)';
+          statusBox.style.color = '#34D399';
+          statusBox.innerHTML = `<strong>SOS DISPATCHED!</strong><br>Nearest Team: ${data.nearest_rescue_team || 'SDRF Sambalpur'}<br>Stay in a safe elevated position.`;
+        })
+        .catch(() => {
+          statusBox.style.background = 'rgba(16, 185, 129, 0.2)';
+          statusBox.style.color = '#34D399';
+          statusBox.innerHTML = '<strong>SOS Dispatched</strong> to Emergency Rescue Center.';
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      initHourlyChart();
+    });
+  </script>
+</body>
+</html>

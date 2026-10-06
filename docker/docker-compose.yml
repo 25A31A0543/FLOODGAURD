@@ -1,0 +1,114 @@
+﻿# ============================================================
+# FloodGuard AI Platform - Docker Compose (Local Development)
+# Step 5: Integration & Scaling
+# Usage: docker-compose up --build
+# ============================================================
+
+version: "3.9"
+
+services:
+  floodguard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: floodguard_api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=sqlite:///./data/postgis_spatial.db
+      - REDIS_URL=redis://redis:6379/0
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_API_KEY=${TWILIO_API_KEY}
+      - TWILIO_API_SECRET=${TWILIO_API_SECRET}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - FAST2SMS_API_KEY=${FAST2SMS_API_KEY}
+    volumes:
+      - ../data:/app/data
+      - ../floodguard/config:/app/floodguard/config
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - floodguard_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: floodguard_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks:
+      - floodguard_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgis:
+    image: postgis/postgis:15-3.4
+    container_name: floodguard_postgis
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=floodguard
+      - POSTGRES_USER=floodguard
+      - POSTGRES_PASSWORD=floodguard_secure_pw
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    networks:
+      - floodguard_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U floodguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: floodguard_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - floodguard_net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: floodguard_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=floodguard_admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - floodguard_net
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgis_data:
+  grafana_data:
+
+networks:
+  floodguard_net:
+    driver: bridge

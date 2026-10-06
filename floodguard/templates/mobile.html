@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloodGuard — Citizen Alert & SOS Interface</title>
+
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(180deg, #f0f7ff 0%, #e0effe 100%);
+      color: #0f172a;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    /* Soft Blue & White Card Surfaces */
+    .card-surface {
+      background: #ffffff;
+      border: 1px solid #bfdbfe;
+      border-radius: 1.25rem;
+      box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.08), 0 8px 10px -6px rgba(2, 132, 199, 0.04);
+    }
+
+    .card-hover {
+      transition: all 0.25s ease;
+    }
+    .card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px -5px rgba(2, 132, 199, 0.15);
+      border-color: #60a5fa;
+    }
+
+    /* Pulsing Big SOS Button */
+    .sos-pulse-container {
+      position: relative;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .sos-ring {
+      position: absolute;
+      border-radius: 9999px;
+      background: rgba(239, 68, 68, 0.35);
+      animation: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+    .sos-ring-2 {
+      position: absolute;
+      border-radius: 9999px;
+      background: rgba(239, 68, 68, 0.2);
+      animation: ping-slower 3.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes ping-slow {
+      0% { width: 100%; height: 100%; opacity: 0.8; }
+      100% { width: 145%; height: 145%; opacity: 0; }
+    }
+    @keyframes ping-slower {
+      0% { width: 100%; height: 100%; opacity: 0.6; }
+      100% { width: 180%; height: 180%; opacity: 0; }
+    }
+
+    .btn-sos {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #991b1b 100%);
+      box-shadow: 0 12px 35px rgba(220, 38, 38, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-sos:hover {
+      transform: scale(1.04);
+      box-shadow: 0 16px 45px rgba(220, 38, 38, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+    }
+    .btn-sos:active {
+      transform: scale(0.96);
+    }
+
+    /* Map Customization */
+    .leaflet-container {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 1rem;
+      padding: 4px;
+      box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+    }
+
+    /* Custom Shelter Icon */
+    .shelter-pin {
+      background: #0284c7;
+      border: 2px solid #ffffff;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+  <!-- TOP HEADER -->
+  <header class="w-full bg-white/90 backdrop-blur-md border-b border-blue-100 sticky top-0 z-40 px-4 md:px-8 py-3.5 shadow-sm">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <!-- Title & Branding -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i data-lucide="shield-alert" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-base md:text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>FloodGuard</span>
+            <span class="text-blue-500 font-normal">—</span>
+            <span class="text-blue-700 font-bold text-sm md:text-lg">Citizen Alert & SOS Interface</span>
+          </h1>
+          <div class="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Emergency Broadcast Connected</span>
+            <span class="text-slate-300">•</span>
+            <span>ODRAF / NDRF Active Grid</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <div class="flex items-center gap-2 md:gap-3">
+        <a href="/public" class="text-xs font-semibold px-3 py-1.5 rounded-xl text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition flex items-center gap-1.5">
+          <i data-lucide="cloud-rain" class="w-4 h-4 text-blue-600"></i>
+          <span class="hidden sm:inline">Weather Forecast</span>
+        </a>
+        <a href="/authority" class="text-xs font-semibold px-3 py-1.5 rounded-xl text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition flex items-center gap-1.5">
+          <i data-lucide="building-shield" class="w-4 h-4 text-slate-600"></i>
+          <span class="hidden sm:inline">Authority View</span>
+        </a>
+        <a href="/" class="text-xs font-bold px-3 py-1.5 rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition flex items-center gap-1">
+          <i data-lucide="home" class="w-4 h-4"></i>
+          <span>Home</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WRAPPER -->
+  <main class="max-w-7xl mx-auto w-full p-4 md:p-6 flex-1 space-y-6">
+
+    <!-- TOP SECTION: LIVE FLOOD WARNINGS & WEATHER DETAILS (ABOVE CENTER SOS) -->
+    <section class="space-y-4">
+      
+      <!-- Primary Live Flood Warning Alert Banner -->
+      <div class="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-red-500 via-rose-600 to-red-600 text-white shadow-xl shadow-red-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-2 border-red-400">
+        <div class="flex items-start gap-3.5">
+          <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 text-white animate-pulse">
+            <i data-lucide="alert-triangle" class="w-7 h-7"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="bg-white text-red-700 text-[11px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider">Tier 3 Danger</span>
+              <span class="text-red-100 text-xs font-medium">CAP Protocol Broadcast</span>
+            </div>
+            <h2 class="text-xl md:text-2xl font-black tracking-tight mt-0.5">High Flood Risk in Your Area</h2>
+            <p class="text-red-100 text-xs md:text-sm mt-0.5 leading-snug">
+              Hirakud Dam releasing 450,000 cusecs into Mahanadi. Water depth rising at <strong>6.2 cm/hr</strong>. Evacuate lowlands immediately.
+            </p>
+          </div>
+        </div>
+
+        <!-- Location Badge -->
+        <div class="bg-black/20 backdrop-blur-md border border-white/20 px-4 py-2.5 rounded-xl shrink-0 text-left md:text-right">
+          <div class="text-[11px] text-red-200 uppercase font-semibold">Your Detected Sector</div>
+          <div class="text-sm font-bold text-white flex items-center gap-1.5 md:justify-end">
+            <i data-lucide="map-pin" class="w-4 h-4 text-amber-300"></i>
+            <span>Sambalpur Lowlands (Sector 4)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-Time Weather Details Grid (temperature, rainfall, humidity, wind speed) -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        
+        <!-- Metric 1: Temperature -->
+        <div class="card-surface p-4 card-hover flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Temperature</span>
+            <div class="text-2xl md:text-3xl font-black text-slate-900 mt-1">28°C</div>
+            <span class="text-[11px] text-slate-500 font-medium">Feels like 30.2°C</span>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
+            <i data-lucide="thermometer-sun" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <!-- Metric 2: Rainfall -->
+        <div class="card-surface p-4 card-hover border-l-4 border-l-blue-600 flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Rainfall Intensity</span>
+            <div class="text-2xl md:text-3xl font-black text-blue-900 mt-1">45 <span class="text-base font-bold text-blue-600">mm/h</span></div>
+            <span class="text-[11px] text-rose-600 font-bold flex items-center gap-1">
+              <i data-lucide="arrow-up-right" class="w-3 h-3"></i> Torrential Downpour
+            </span>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center">
+            <i data-lucide="cloud-rain" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <!-- Metric 3: Humidity -->
+        <div class="card-surface p-4 card-hover flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Humidity</span>
+            <div class="text-2xl md:text-3xl font-black text-slate-900 mt-1">88%</div>
+            <span class="text-[11px] text-slate-500 font-medium">Saturated Atmosphere</span>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center">
+            <i data-lucide="droplets" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <!-- Metric 4: Wind Speed -->
+        <div class="card-surface p-4 card-hover flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Wind Speed</span>
+            <div class="text-2xl md:text-3xl font-black text-slate-900 mt-1">24 <span class="text-base font-bold text-slate-600">km/h</span></div>
+            <span class="text-[11px] text-slate-500 font-medium">Gusting SE 38 km/h</span>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
+            <i data-lucide="wind" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- CENTER HERO SECTION: LARGE RED SOS BUTTON IN THE CENTER -->
+    <section class="card-surface p-8 text-center relative overflow-hidden bg-gradient-to-b from-white via-blue-50/40 to-red-50/30 border-2 border-red-200">
+      <div class="max-w-md mx-auto flex flex-col items-center">
+        
+        <div class="inline-flex items-center gap-2 bg-red-100 text-red-700 font-bold text-xs px-3 py-1 rounded-full mb-3 border border-red-300">
+          <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+          <span>EMERGENCY CITIZEN ASSISTANCE</span>
+        </div>
+
+        <h3 class="text-lg md:text-xl font-bold text-slate-900">Are you in immediate danger or trapped?</h3>
+        <p class="text-xs text-slate-600 mt-1 mb-6">
+          Pressing the button immediately relays your exact GPS coordinates to NDRF, ODRAF, and district rescue teams.
+        </p>
+
+        <!-- The Large Red SOS Button -->
+        <div class="sos-pulse-container my-4">
+          <div class="sos-ring"></div>
+          <div class="sos-ring-2"></div>
+          <button onclick="triggerCitizenSOS()" class="btn-sos w-48 h-48 md:w-56 md:h-56 rounded-full flex flex-col items-center justify-center text-white cursor-pointer relative z-10 select-none group">
+            <i data-lucide="bell-ring" class="w-12 h-12 md:w-16 md:h-16 text-white group-hover:animate-bounce mb-1"></i>
+            <span class="text-xl md:text-2xl font-black tracking-wider uppercase drop-shadow-md">Send SOS Alert</span>
+            <span class="text-[10px] md:text-xs text-red-100 font-bold mt-1 tracking-widest bg-red-900/40 px-3 py-0.5 rounded-full">ONE-TAP RESCUE</span>
+          </button>
+        </div>
+
+        <div class="text-xs text-slate-500 font-medium mt-4 flex items-center gap-1.5">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+          <span>Verified Encrypted Channel • Toll-Free Disaster Lifeline</span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- QUICK-ACCESS BUTTONS: SAFETY TIPS, EMERGENCY CONTACTS, LIVE MAP -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      
+      <!-- Quick Button 1: Safety Tips -->
+      <button onclick="openModal('safetyModal')" class="card-surface p-4 card-hover flex items-center gap-4 text-left group cursor-pointer border-blue-200 hover:border-blue-500 bg-white">
+        <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition">
+          <i data-lucide="life-buoy" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition">Safety Tips</h4>
+          <p class="text-xs text-slate-500 mt-0.5">What to do before, during & after flood inundation.</p>
+        </div>
+        <i data-lucide="chevron-right" class="w-5 h-5 text-slate-400 ml-auto group-hover:translate-x-1 transition"></i>
+      </button>
+
+      <!-- Quick Button 2: Emergency Contacts -->
+      <button onclick="openModal('contactsModal')" class="card-surface p-4 card-hover flex items-center gap-4 text-left group cursor-pointer border-blue-200 hover:border-blue-500 bg-white">
+        <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 group-hover:bg-rose-600 group-hover:text-white transition">
+          <i data-lucide="phone-call" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm group-hover:text-rose-600 transition">Emergency Contacts</h4>
+          <p class="text-xs text-slate-500 mt-0.5">Direct hotlines to NDRF, ODRAF, 112 & local shelters.</p>
+        </div>
+        <i data-lucide="chevron-right" class="w-5 h-5 text-slate-400 ml-auto group-hover:translate-x-1 transition"></i>
+      </button>
+
+      <!-- Quick Button 3: Live Map -->
+      <a href="#live-map-section" class="card-surface p-4 card-hover flex items-center gap-4 text-left group border-blue-200 hover:border-blue-500 bg-white">
+        <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition">
+          <i data-lucide="map-pinned" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm group-hover:text-emerald-600 transition">Live Map</h4>
+          <p class="text-xs text-slate-500 mt-0.5">Red/yellow hazard zones, green safe areas & shelters.</p>
+        </div>
+        <i data-lucide="arrow-down" class="w-5 h-5 text-slate-400 ml-auto group-hover:translate-y-1 transition"></i>
+      </a>
+
+    </section>
+
+    <!-- DUAL SECTION: INTERACTIVE LIVE MAP & CAP NOTIFICATION PANEL -->
+    <div id="live-map-section" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- INTERACTIVE MAP (7 COLS) -->
+      <section class="lg:col-span-7 card-surface p-5 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 class="font-bold text-slate-900 text-base md:text-lg flex items-center gap-2">
+              <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
+              <span>Interactive Citizen Flood & Shelter Map</span>
+            </h3>
+            <p class="text-xs text-slate-500">Live spatial boundaries: Flood zones, safe zones & nearby relief shelters.</p>
+          </div>
+
+          <!-- Quick Map Filter Switches -->
+          <div class="flex items-center gap-1.5 text-xs bg-slate-100 p-1 rounded-xl">
+            <button onclick="filterMap('all')" id="mf-all" class="px-2.5 py-1 rounded-lg font-bold bg-white text-blue-700 shadow-sm">All</button>
+            <button onclick="filterMap('danger')" id="mf-danger" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-red-600">Red Zones</button>
+            <button onclick="filterMap('shelter')" id="mf-shelter" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-blue-600">Shelters</button>
+          </div>
+        </div>
+
+        <!-- Leaflet Map Container -->
+        <div id="citizenMap" class="w-full h-[400px] md:h-[460px] rounded-xl border border-blue-200 overflow-hidden relative z-10"></div>
+
+        <!-- Map Legend -->
+        <div class="mt-4 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-red-600"></span>
+              <span class="text-slate-700 font-medium">Severe Zone (Red)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+              <span class="text-slate-700 font-medium">Moderate Zone (Yellow)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+              <span class="text-slate-700 font-medium">Safe Zone (Green)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-blue-600"></span>
+              <span class="text-slate-700 font-medium">Shelters (Icon)</span>
+            </div>
+          </div>
+          <span class="text-slate-400 font-mono text-[11px]">Updated 2 mins ago</span>
+        </div>
+      </section>
+
+      <!-- CAP NOTIFICATION PANEL & EVACUATION MESSAGES (5 COLS) -->
+      <section class="lg:col-span-5 card-surface p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-4 border-b border-blue-100 pb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+              <i data-lucide="bell" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm md:text-base">CAP Alerts & Evacuation Feed</h3>
+              <p class="text-[11px] text-slate-500">Common Alerting Protocol (OASIS CAP v1.2)</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full animate-pulse">LIVE BROADCAST</span>
+        </div>
+
+        <!-- Alert Feed Scroll List -->
+        <div class="space-y-3 overflow-y-auto max-h-[440px] pr-1">
+          
+          <!-- Evacuation Alert Card -->
+          <div class="p-3.5 rounded-xl bg-red-50/80 border-l-4 border-l-red-600 border border-red-200">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-black text-red-700 flex items-center gap-1">
+                <i data-lucide="megaphone" class="w-3.5 h-3.5"></i> MANDATORY EVACUATION
+              </span>
+              <span class="text-slate-400 font-mono text-[11px]">10 mins ago</span>
+            </div>
+            <h5 class="text-xs font-bold text-slate-900">Sectors 3 & 4: Move to Relief Shelter 2</h5>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              Mahanadi water level exceeded 8.5m danger threshold. Government buses stationed at Sambalpur Clock Tower for immediate transit.
+            </p>
+            <div class="mt-2 flex items-center gap-2">
+              <a href="#live-map-section" onclick="focusShelter(1)" class="text-[11px] font-bold text-red-700 hover:underline flex items-center gap-1">
+                <i data-lucide="navigation" class="w-3 h-3"></i> Route to Shelter
+              </a>
+            </div>
+          </div>
+
+          <!-- Flash Flood Watch -->
+          <div class="p-3.5 rounded-xl bg-amber-50/80 border-l-4 border-l-amber-500 border border-amber-200">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-bold text-amber-800 flex items-center gap-1">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> FLASH FLOOD WATCH
+              </span>
+              <span class="text-slate-400 font-mono text-[11px]">28 mins ago</span>
+            </div>
+            <h5 class="text-xs font-bold text-slate-900">Burla Old Town Embankment Alert</h5>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              Continuous torrential rainfall expected for the next 6 hours. Secure livestock, power supplies, and essential medications.
+            </p>
+          </div>
+
+          <!-- Dam Release Advisory -->
+          <div class="p-3.5 rounded-xl bg-blue-50/80 border-l-4 border-l-blue-600 border border-blue-200">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-bold text-blue-800 flex items-center gap-1">
+                <i data-lucide="info" class="w-3.5 h-3.5"></i> CWC DAM DISCHARGE BULLETIN
+              </span>
+              <span class="text-slate-400 font-mono text-[11px]">1 hr ago</span>
+            </div>
+            <h5 class="text-xs font-bold text-slate-900">Hirakud Dam: 24 Sluice Gates Opened</h5>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              Current outflow is 450,000 cusecs. River downstream velocity increasing. Public advised not to venture near riverbanks.
+            </p>
+          </div>
+
+          <!-- Relief Material Distribution -->
+          <div class="p-3.5 rounded-xl bg-emerald-50/80 border-l-4 border-l-emerald-500 border border-emerald-200">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-bold text-emerald-800 flex items-center gap-1">
+                <i data-lucide="package-check" class="w-3.5 h-3.5"></i> RELIEF & DRINKING WATER
+              </span>
+              <span class="text-slate-400 font-mono text-[11px]">2 hrs ago</span>
+            </div>
+            <h5 class="text-xs font-bold text-slate-900">Clean Water & Food Supply at Sambalpur High School</h5>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              ODRAF disaster assistance team has established clean water purification kiosks and medical aid stations.
+            </p>
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="w-full bg-white border-t border-blue-100 py-4 px-6 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <i data-lucide="shield" class="w-4 h-4 text-blue-600"></i>
+        <span>FloodGuard Citizen Alert & SOS • Government Disaster Warning Integration</span>
+      </div>
+      <div class="flex items-center gap-4 text-blue-600 font-medium">
+        <a href="/public" class="hover:underline">Weather Forecast</a>
+        <span>•</span>
+        <a href="/authority" class="hover:underline">Authority Dashboard</a>
+        <span>•</span>
+        <a href="/" class="hover:underline">Gateway</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL 1: SOS CONFIRMATION & DIRECT RESCUE DISPATCH -->
+  <div id="sosAlertModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="card-surface max-w-md w-full p-6 text-center border-2 border-red-500 shadow-2xl animate-scaleIn">
+      <div class="w-16 h-16 rounded-full bg-red-100 border-2 border-red-500 mx-auto flex items-center justify-center text-red-600 mb-4 animate-bounce">
+        <i data-lucide="siren" class="w-8 h-8"></i>
+      </div>
+      <h3 class="text-2xl font-black text-slate-900">SEND EMERGENCY SOS?</h3>
+      <p class="text-xs text-slate-600 mt-2">
+        This will immediately transmit your real-time GPS position to NDRF, ODRAF, and nearest emergency shelter rescue boats.
+      </p>
+
+      <div class="my-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-left text-xs space-y-1.5">
+        <div class="text-slate-600">Target Station: <strong class="text-red-700 font-bold">Mahanadi Rescue Sector 4</strong></div>
+        <div class="text-slate-600">Detected Coordinates: <strong class="font-mono text-slate-900">21.466° N, 83.975° E</strong></div>
+        <div class="text-slate-600">Action: <strong class="text-slate-900">Dispatch Rescue Boat + Push SMS to Kin</strong></div>
+      </div>
+
+      <div class="flex gap-3 mt-5">
+        <button onclick="closeModal('sosAlertModal')" class="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+          Cancel
+        </button>
+        <button onclick="confirmCitizenSOS()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-lg shadow-red-600/40 transition">
+          YES, TRANSMIT SOS
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: SAFETY TIPS -->
+  <div id="safetyModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="card-surface max-w-lg w-full p-6 border-blue-200 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+            <i data-lucide="life-buoy" class="w-5 h-5"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Flood Safety & Survival Tips</h3>
+        </div>
+        <button onclick="closeModal('safetyModal')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs text-slate-700">
+        <!-- Tip 1 -->
+        <div class="p-3 rounded-xl bg-blue-50 border border-blue-200">
+          <h5 class="font-bold text-blue-900 text-sm flex items-center gap-1.5 mb-1">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-blue-600"></i>
+            1. What to Do During Flash Floods
+          </h5>
+          <ul class="list-disc pl-5 space-y-1 text-slate-600 mt-1">
+            <li>Never attempt to walk or drive through flowing water. Just 6 inches of rapid water can knock you down.</li>
+            <li>Move immediately to higher ground or upper building levels.</li>
+            <li>Turn off main electricity switch and LPG gas valves before evacuating.</li>
+          </ul>
+        </div>
+
+        <!-- Tip 2 -->
+        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
+          <h5 class="font-bold text-amber-900 text-sm flex items-center gap-1.5 mb-1">
+            <i data-lucide="package" class="w-4 h-4 text-amber-600"></i>
+            2. Essential Emergency Grab-Bag Kit
+          </h5>
+          <ul class="list-disc pl-5 space-y-1 text-slate-600 mt-1">
+            <li>Drinking water bottles (at least 3 liters per person).</li>
+            <li>Non-perishable food (biscuits, dates, dry fruits).</li>
+            <li>Waterproof pouch with Aadhaar, ID cards, insurance documents.</li>
+            <li>Flashlight, power bank, whistle, and basic first-aid medications.</li>
+          </ul>
+        </div>
+
+        <!-- Tip 3 -->
+        <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
+          <h5 class="font-bold text-rose-900 text-sm flex items-center gap-1.5 mb-1">
+            <i data-lucide="zap-off" class="w-4 h-4 text-rose-600"></i>
+            3. Electrical & Waterborne Hazards
+          </h5>
+          <ul class="list-disc pl-5 space-y-1 text-slate-600 mt-1">
+            <li>Do not touch electrical equipment or fallen utility lines if wet.</li>
+            <li>Do not drink unfiltered flood tap water. Boil water thoroughly before drinking.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <button onclick="closeModal('safetyModal')" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition">
+          Got It, Back to Safety
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: EMERGENCY CONTACTS -->
+  <div id="contactsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="card-surface max-w-md w-full p-6 border-blue-200 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+            <i data-lucide="phone-call" class="w-5 h-5"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Emergency Hotlines & Relief</h3>
+        </div>
+        <button onclick="closeModal('contactsModal')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <a href="tel:1078" class="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-300 transition">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold">1078</div>
+            <div>
+              <div class="font-bold text-slate-900">NDRF National Helpline</div>
+              <div class="text-[11px] text-slate-500">24x7 Flood Rescue Command</div>
+            </div>
+          </div>
+          <span class="text-red-600 font-bold">Call Now</span>
+        </a>
+
+        <a href="tel:1070" class="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 transition">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold">1070</div>
+            <div>
+              <div class="font-bold text-slate-900">ODRAF State Emergency</div>
+              <div class="text-[11px] text-slate-500">Odisha Disaster Rapid Action Force</div>
+            </div>
+          </div>
+          <span class="text-amber-600 font-bold">Call Now</span>
+        </a>
+
+        <a href="tel:112" class="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">112</div>
+            <div>
+              <div class="font-bold text-slate-900">All-in-One Emergency (Police/Fire)</div>
+              <div class="text-[11px] text-slate-500">Integrated Emergency Response</div>
+            </div>
+          </div>
+          <span class="text-blue-600 font-bold">Call Now</span>
+        </a>
+
+        <a href="tel:108" class="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 transition">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">108</div>
+            <div>
+              <div class="font-bold text-slate-900">Medical Ambulance Emergency</div>
+              <div class="text-[11px] text-slate-500">Emergency Medical Service</div>
+            </div>
+          </div>
+          <span class="text-emerald-600 font-bold">Call Now</span>
+        </a>
+      </div>
+
+      <div class="mt-5">
+        <button onclick="closeModal('contactsModal')" class="w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Map Setup
+    let map = L.map('citizenMap', {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([21.48, 83.96], 12);
+
+    const cartoKey = 'cb1_2xm7_1_7f41667ad0188b79dff91e16';
+    const voyagerTiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${cartoKey}`, {
+      subdomains: 'abcd',
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
+    });
+
+    const darkTiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${cartoKey}`, {
+      subdomains: 'abcd',
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
+    });
+
+    voyagerTiles.addTo(map);
+    L.control.layers({
+      "CARTO Voyager (Citizen Navigation)": voyagerTiles,
+      "CARTO Dark Matter": darkTiles
+    }, null, { position: 'topright' }).addTo(map);
+
+    // Map Zones & Shelter Data
+    const hazardPolygons = [
+      // Red Zone 1: Sambalpur Lowlands
+      {
+        type: 'polygon',
+        coords: [[21.455, 83.965], [21.472, 83.978], [21.463, 83.992], [21.448, 83.975]],
+        color: '#ef4444',
+        fillColor: '#ef4444',
+        fillOpacity: 0.45,
+        title: 'Severe Flood Zone (Red)',
+        depth: 'Water Depth: 1.8m - 2.5m',
+        warning: 'Immediate Evacuation Required'
+      },
+      // Red Zone 2: Burla Old Riverbank
+      {
+        type: 'polygon',
+        coords: [[21.495, 83.865], [21.510, 83.875], [21.503, 83.890], [21.488, 83.878]],
+        color: '#ef4444',
+        fillColor: '#ef4444',
+        fillOpacity: 0.45,
+        title: 'Spillway Channel Inundation (Red)',
+        depth: 'Water Depth: 2.2m',
+        warning: 'Breached Riverbank Warning'
+      },
+      // Yellow Zone 1: Dhanupali & Khetrajpur
+      {
+        type: 'polygon',
+        coords: [[21.475, 83.955], [21.488, 83.965], [21.482, 83.980], [21.470, 83.970]],
+        color: '#f59e0b',
+        fillColor: '#f59e0b',
+        fillOpacity: 0.35,
+        title: 'Moderate Waterlogging Zone (Yellow)',
+        depth: 'Water Depth: 0.4m - 0.9m',
+        warning: 'Caution: Road Transport Closed'
+      },
+      // Green Safe Zone 1: Ainthapali Elevated Ground
+      {
+        type: 'polygon',
+        coords: [[21.492, 83.985], [21.515, 84.005], [21.500, 84.020], [21.485, 83.998]],
+        color: '#10b981',
+        fillColor: '#10b981',
+        fillOpacity: 0.25,
+        title: 'Designated Safe Zone (Green)',
+        depth: 'Elevation: +45m Above Riverbank',
+        warning: 'Safe for Civilian Refuge'
+      }
+    ];
+
+    const shelters = [
+      {
+        id: 1,
+        name: "Sambalpur Central Relief Camp #1",
+        coords: [21.495, 83.995],
+        capacity: "Capacity: 1,200 (450 available)",
+        foodStatus: "Hot Meals & Drinking Water Available",
+        medical: "Medical Doctor on Site",
+        distance: "1.4 km from your sector"
+      },
+      {
+        id: 2,
+        name: "Government Higher Secondary Refuge",
+        coords: [21.510, 84.008],
+        capacity: "Capacity: 800 (320 available)",
+        foodStatus: "Food Kits & Blankets Ready",
+        medical: "First Aid & Child Support",
+        distance: "2.8 km from your sector"
+      },
+      {
+        id: 3,
+        name: "Ainthapali Indoor Stadium Shelter",
+        coords: [21.490, 84.015],
+        capacity: "Capacity: 2,500 (1,100 available)",
+        foodStatus: "Community Kitchen Live",
+        medical: "Mobile Health Unit Active",
+        distance: "3.5 km from your sector"
+      }
+    ];
+
+    let polyLayers = [];
+    let shelterMarkers = [];
+
+    function renderMapItems() {
+      // Draw Polygons
+      hazardPolygons.forEach(p => {
+        const poly = L.polygon(p.coords, {
+          color: p.color,
+          weight: 2,
+          fillColor: p.fillColor,
+          fillOpacity: p.fillOpacity
+        }).addTo(map);
+
+        poly.bindPopup(`
+          <div class="text-xs p-1">
+            <h6 class="font-bold text-sm" style="color:${p.color}">${p.title}</h6>
+            <div class="font-semibold text-slate-800 mt-1">${p.depth}</div>
+            <div class="text-slate-500 mt-0.5">${p.warning}</div>
+          </div>
+        `);
+        polyLayers.push({ layer: poly, color: p.color });
+      });
+
+      // Draw Shelter Icons
+      shelters.forEach(s => {
+        const customIcon = L.divIcon({
+          className: 'custom-shelter',
+          html: `<div class="shelter-pin" style="width:34px;height:34px;"><i data-lucide="home" style="width:18px;height:18px;"></i></div>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        });
+
+        const marker = L.marker(s.coords, { icon: customIcon }).addTo(map);
+        marker.bindPopup(`
+          <div class="text-xs p-1">
+            <div class="flex items-center gap-1.5 mb-1">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+              <strong class="text-sm font-bold text-blue-900">${s.name}</strong>
+            </div>
+            <div class="text-slate-700 font-semibold">${s.capacity}</div>
+            <div class="text-emerald-700 font-medium mt-0.5">${s.foodStatus}</div>
+            <div class="text-blue-700 font-medium">${s.medical}</div>
+            <div class="text-slate-500 mt-1 font-bold">${s.distance}</div>
+          </div>
+        `);
+        shelterMarkers.push(marker);
+      });
+
+      // Re-run Lucide icons for DivIcon SVGs
+      lucide.createIcons();
+    }
+
+    renderMapItems();
+
+    function filterMap(type) {
+      // Reset button styles
+      ['all', 'danger', 'shelter'].forEach(t => {
+        const btn = document.getElementById('mf-' + t);
+        if (t === type) {
+          btn.className = 'px-2.5 py-1 rounded-lg font-bold bg-white text-blue-700 shadow-sm';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900';
+        }
+      });
+
+      if (type === 'all') {
+        polyLayers.forEach(pl => map.addLayer(pl.layer));
+        shelterMarkers.forEach(sm => map.addLayer(sm));
+      } else if (type === 'danger') {
+        polyLayers.forEach(pl => {
+          if (pl.color === '#ef4444') {
+            map.addLayer(pl.layer);
+          } else {
+            map.removeLayer(pl.layer);
+          }
+        });
+        shelterMarkers.forEach(sm => map.removeLayer(sm));
+      } else if (type === 'shelter') {
+        polyLayers.forEach(pl => map.removeLayer(pl.layer));
+        shelterMarkers.forEach(sm => map.addLayer(sm));
+      }
+    }
+
+    function focusShelter(id) {
+      const s = shelters.find(item => item.id === id);
+      if (s) {
+        map.setView(s.coords, 14);
+        const idx = shelters.indexOf(s);
+        if (shelterMarkers[idx]) shelterMarkers[idx].openPopup();
+      }
+    }
+
+    // Modal Control Functions
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // SOS Flow
+    function triggerCitizenSOS() {
+      openModal('sosAlertModal');
+    }
+
+    function confirmCitizenSOS() {
+      closeModal('sosAlertModal');
+      alert("🚨 EMERGENCY SOS BROADCAST: Your GPS coordinates (21.466 N, 83.975 E) have been transmitted to NDRF Command and nearest rescue craft! Stay on high ground.");
+    }
+  </script>
+</body>
+</html>

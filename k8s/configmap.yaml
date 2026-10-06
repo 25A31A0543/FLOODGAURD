@@ -1,0 +1,42 @@
+﻿# ============================================================
+# FloodGuard AI Platform - Kubernetes ConfigMaps
+# Step 5: Integration & Scaling
+# ============================================================
+
+---
+# Development Environment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: floodguard-config
+  namespace: floodguard
+  labels:
+    environment: production
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "info"
+  API_VERSION: "v1"
+  CATCHMENT_BASIN: "Mahanadi-Hirakud"
+  DISTRICTS: "Sambalpur,Bargarh,Cuttack,Jharsuguda,Hirakud,Burla"
+  FORECAST_HORIZON_HOURS: "72"
+  ALERT_DISPATCH_INTERVAL_MINUTES: "15"
+  PROMETHEUS_METRICS_ENABLED: "true"
+  PROMETHEUS_METRICS_PATH: "/metrics"
+  CORS_ALLOWED_ORIGINS: "*"
+  GRAFANA_URL: "http://floodguard-grafana:3000"
+  PROMETHEUS_URL: "http://floodguard-prometheus:9090"
+
+---
+# Staging ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: floodguard-config-staging
+  namespace: floodguard-staging
+data:
+  ENVIRONMENT: "staging"
+  LOG_LEVEL: "debug"
+  API_VERSION: "v1"
+  CATCHMENT_BASIN: "Mahanadi-Hirakud"
+  FORECAST_HORIZON_HOURS: "72"
+  PROMETHEUS_METRICS_ENABLED: "true"

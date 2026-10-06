@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Environment Variables & Secrets
+.env
+floodguard/config/firebase_credentials.json
+floodguard/config/gcp_service_account.json
+
+# Backup files
+*.bak
+
+# Telemetry data storage
+data/
+
+# OS
+.DS_Store
+Thumbs.db
