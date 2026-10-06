@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # FloodGuard AI Platform - Production Multi-Stage Dockerfile
 # Step 5: Integration & Scaling
 # ============================================================
@@ -21,7 +21,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /install /usr/local
 COPY floodguard/ ./floodguard/
-COPY data/ ./data/
+RUN mkdir -p /app/data
 COPY run_server.py .
 RUN groupadd -r floodguard && useradd -r -g floodguard floodguard && chown -R floodguard:floodguard /app
 USER floodguard

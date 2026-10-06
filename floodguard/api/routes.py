@@ -33,6 +33,12 @@ async def get_status():
     return ingestion_engine.get_engine_status()
 
 
+@router.get("/health", summary="Platform Health Check")
+async def health_check():
+    """Standard health check endpoint for Docker and Kubernetes."""
+    return {"status": "healthy", "service": "FloodGuard API", "version": "1.0.0"}
+
+
 @router.post("/ingest/nasa-gpm", response_model=IngestionReceipt, summary="Ingest NASA GPM Satellite Feed")
 async def ingest_nasa_gpm(
     storm_intensity: float = Query(1.0, ge=0.1, le=5.0, description="Simulated precipitation multiplier")
