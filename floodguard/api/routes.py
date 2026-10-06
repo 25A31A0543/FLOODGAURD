@@ -1,11 +1,28 @@
 from datetime import datetime, timezone
 from typing import Optional, List
-from fastapi import APIRouter, Query
+from typing import Optional as Opt
+from fastapi import APIRouter, Body, Query
 from floodguard.config import settings
 from floodguard.schemas.common import IngestionReceipt
 from floodguard.schemas.sources import UnifiedTelemetryFrame
+from floodguard.schemas.forecast import (
+    RainfallForecastResult,
+    FloodInundationGeoJSON,
+    Step2ForecastInundationResult
+)
+from floodguard.schemas.alerts import (
+    CAPAlertPayload, AlertDispatchReceipt,
+    CitizenRegistration, CitizenProfile, GeofencedDispatchResult
+)
 from floodguard.services.engine import ingestion_engine
+from floodguard.services.forecast_service import forecast_service
+from floodguard.services.alert_service import alert_service
+from floodguard.models.rainfall_forecast import rainfall_engine
+from floodguard.models.inundation_unet import unet_engine
+from floodguard.models.validation import validation_engine
+from floodguard.models.registry import model_registry
 from floodguard.storage.buffer import storage_buffer
+from floodguard.storage.spatial_db import spatial_db
 
 
 router = APIRouter(prefix="/api/v1", tags=["Data Ingestion"])
@@ -91,15 +108,6 @@ async def get_receipts(limit: int = Query(20, ge=1, le=100)):
 
 
 # ---------------- STEP 2: FORECAST & INUNDATION MODELING ROUTES ----------------
-from floodguard.schemas.forecast import (
-    RainfallForecastResult,
-    FloodInundationGeoJSON,
-    Step2ForecastInundationResult
-)
-from floodguard.services.forecast_service import forecast_service
-from floodguard.models.rainfall_forecast import rainfall_engine
-from floodguard.models.inundation_unet import unet_engine
-from floodguard.storage.spatial_db import spatial_db
 
 
 @router.post("/forecast/rainfall", response_model=RainfallForecastResult, summary="Step 2: 72-hr Rainfall Forecast (LSTM/GRU/Transformer + NWP)")
@@ -165,8 +173,6 @@ async def get_spatial_polygons():
 
 
 # ---------------- STEP 3: ALERT ENGINE & EMERGENCY RESPONSE ROUTES ----------------
-from floodguard.schemas.alerts import CAPAlertPayload, AlertDispatchReceipt
-from floodguard.services.alert_service import alert_service
 
 
 @router.post("/alerts/generate", response_model=CAPAlertPayload, summary="Step 3: Generate OASIS CAP v1.2 Flood Alert")
@@ -245,8 +251,6 @@ async def execute_complete_pipeline(
 
 
 # -------- STEP 2 MONITORING, VALIDATION & ADVANCED ENDPOINTS --------
-from floodguard.models.validation import validation_engine
-from floodguard.models.registry import model_registry
 
 
 @router.get("/forecast/status", summary="Step 2: Model Health & Monitoring Status")
@@ -344,7 +348,6 @@ async def get_transfer_learning_status():
 
 
 # -------- STEP 3 CITIZEN EMERGENCY DIRECTORY & GEOFENCED ALERTS --------
-from floodguard.schemas.alerts import CitizenRegistration, CitizenProfile, GeofencedDispatchResult
 
 
 @router.post("/citizens/register", summary="Step 3: Register Citizen for Targeted Alerts")
@@ -1054,8 +1057,6 @@ async def scaling_cicd_status():
 #  SOS / Real-Time Emergency Communication Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
-from fastapi import Body
-from typing import Optional as Opt
 
 @router.post("/sos/trigger", summary="Trigger Real-Time SOS Emergency Broadcast")
 async def trigger_sos(
