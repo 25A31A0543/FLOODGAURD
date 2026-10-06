@@ -1,9 +1,7 @@
 import math
 import uuid
-import random
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
-import numpy as np
 
 from floodguard.schemas.common import GeoBoundingBox
 from floodguard.schemas.sources import UnifiedTelemetryFrame

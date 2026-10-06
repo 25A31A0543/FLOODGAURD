@@ -1,11 +1,10 @@
 import math
 import uuid
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional, Tuple
-import numpy as np
+from typing import List, Dict, Any, Optional
 
 from floodguard.schemas.common import GeoBoundingBox
-from floodguard.schemas.sources import UnifiedTelemetryFrame, DEMTerrainPayload
+from floodguard.schemas.sources import DEMTerrainPayload
 from floodguard.schemas.forecast import (
     FloodPolygonProperties,
     GeoJSONFeature,

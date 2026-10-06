@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from floodguard.main import app
 from floodguard.storage.spatial_db import spatial_db

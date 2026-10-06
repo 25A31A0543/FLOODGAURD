@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from typing import Optional, List
-from typing import Optional as Opt
 from fastapi import APIRouter, Body, Query
 from floodguard.config import settings
 from floodguard.schemas.common import IngestionReceipt
@@ -12,7 +11,7 @@ from floodguard.schemas.forecast import (
 )
 from floodguard.schemas.alerts import (
     CAPAlertPayload, AlertDispatchReceipt,
-    CitizenRegistration, CitizenProfile, GeofencedDispatchResult
+    CitizenRegistration
 )
 from floodguard.services.engine import ingestion_engine
 from floodguard.services.forecast_service import forecast_service
@@ -476,12 +475,10 @@ async def mobile_flood_map(
     district: Optional[str] = Query(None, description="Filter by district name")
 ):
     """Returns flood inundation polygons optimised for mobile app rendering."""
-    from floodguard.storage.spatial_db import spatial_db
-    from floodguard.services.forecast_service import forecast_service
     inund = spatial_db.get_latest_inundation()
     polygons = inund.get("features", []) if inund else []
     if not polygons:
-        result = await forecast_service.execute_forecast_pipeline()
+        await forecast_service.execute_forecast_pipeline()
         inund = spatial_db.get_latest_inundation()
         polygons = inund.get("features", []) if inund else []
     districts = ["Sambalpur", "Cuttack", "Hirakud", "Bargarh", "Jharsuguda", "Burla"]
@@ -878,7 +875,6 @@ async def scaling_health():
     and regional clusters (India, Southeast Asia, Africa).
     """
     from datetime import datetime, timezone
-    import platform, os
 
     regions = [
         {"region": "India-Mumbai", "cloud": "AWS ap-south-1", "status": "healthy", "pods_running": 12, "pods_total": 12, "cpu_pct": 34.2, "memory_pct": 58.1},
@@ -1074,7 +1070,8 @@ async def trigger_sos(
     Uses: Twilio Account SID + Auth Token from settings.
     """
     from datetime import datetime, timezone
-    import random, string
+    import random
+    import string
 
     case_id = "SOS-" + datetime.now(timezone.utc).strftime("%Y%m%d") + "-" + "".join(random.choices(string.digits, k=4))
     now_iso  = datetime.now(timezone.utc).isoformat()

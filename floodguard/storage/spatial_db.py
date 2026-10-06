@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 
 from floodguard.config import settings
-from floodguard.schemas.forecast import FloodInundationGeoJSON, GeoJSONFeature, FloodPolygonProperties
+from floodguard.schemas.forecast import FloodInundationGeoJSON
 
 
 class PostGISSpatialStore:

@@ -16,7 +16,6 @@ Comprehensive verification test suite for Step 4 Checklist:
    - PostGIS + APIs feeding all dashboards
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from floodguard.main import app
 from floodguard.storage.spatial_db import spatial_db
@@ -156,10 +155,10 @@ def test_checklist_public_dashboard_live_rainfall_charts():
     assert len(data["x_labels"]) == 25  # 72 hours in 3-hour increments
     assert len(data["datasets"]) == 4    # LSTM, GRU, Transformer, Ensemble Mean
     labels = [d["label"] for d in data["datasets"]]
-    assert any("LSTM" in l for l in labels)
-    assert any("GRU" in l for l in labels)
-    assert any("Transformer" in l for l in labels)
-    assert any("Ensemble" in l for l in labels)
+    assert any("LSTM" in lbl for lbl in labels)
+    assert any("GRU" in lbl for lbl in labels)
+    assert any("Transformer" in lbl for lbl in labels)
+    assert any("Ensemble" in lbl for lbl in labels)
 
 
 def test_checklist_public_dashboard_flood_polygons_overlay():

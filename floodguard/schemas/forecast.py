@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from floodguard.schemas.common import GeoBoundingBox
 

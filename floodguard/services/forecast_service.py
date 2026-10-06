@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
-from floodguard.config import settings
 from floodguard.schemas.common import GeoBoundingBox
 from floodguard.schemas.forecast import (
     RainfallForecastResult,
@@ -140,8 +139,8 @@ class ForecastInundationPipelineService:
         Reports health of all Step 2 AI/ML model components.
         """
         from floodguard.models.registry import model_registry
-        from floodguard.models.validation import validation_engine
-        import json, pathlib
+        import json
+        import pathlib
 
         # Load NWP config
         nwp_config_path = pathlib.Path("floodguard/config/nwp_bias_config.json")

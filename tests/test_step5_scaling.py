@@ -4,9 +4,7 @@ Tests for deployment health, metrics, regions, CI/CD, and infrastructure.
 
 Run: python -m pytest tests/test_step5_scaling.py -v
 """
-import os
 import json
-import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 

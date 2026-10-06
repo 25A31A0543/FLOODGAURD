@@ -13,7 +13,6 @@ from floodguard.schemas.sources import (
     GPMSatellitePayload,
     IMDWeatherPayload,
     DWRVolumeScanPayload,
-    DEMTerrainPayload,
     UnifiedTelemetryFrame
 )
 from floodguard.connectors.nasa_gpm import NASAGPMConnector

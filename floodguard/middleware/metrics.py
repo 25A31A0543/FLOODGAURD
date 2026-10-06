@@ -1,4 +1,4 @@
-﻿"""
+"""
 FloodGuard Step 5: Prometheus Metrics Middleware
 Collects request latency, status codes, and active connections
 for multi-region observability via Prometheus + Grafana.
@@ -122,7 +122,6 @@ def get_metrics_response() -> Response:
             media_type=CONTENT_TYPE_LATEST,
         )
     # Graceful fallback
-    import json
     from fastapi.responses import JSONResponse
     return JSONResponse({
         "status": "prometheus_client_not_installed",

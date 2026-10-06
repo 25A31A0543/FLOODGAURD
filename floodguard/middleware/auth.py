@@ -1,4 +1,4 @@
-﻿"""
+"""
 FloodGuard Step 5: JWT Authentication Middleware
 Protects authority-only endpoints with Bearer token validation.
 """
@@ -6,7 +6,7 @@ import os
 import time
 import secrets
 from typing import Optional
-from fastapi import Request, HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # ---------------------------------------------------------------------------
@@ -40,7 +40,8 @@ def create_access_token(subject: str, role: str = "authority") -> str:
         }
         return pyjwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
     # Fallback: base64-encoded opaque token
-    import base64, json
+    import base64
+    import json
     payload = {"sub": subject, "role": role, "exp": int(time.time()) + ACCESS_TOKEN_EXPIRE_SECONDS}
     return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
 

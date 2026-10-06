@@ -1,5 +1,4 @@
 import asyncio
-import pytest
 from fastapi.testclient import TestClient
 from floodguard.main import app
 from floodguard.models.rainfall_forecast import rainfall_engine

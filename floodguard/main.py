@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import List, Dict, Any
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from floodguard.middleware.metrics import PrometheusMiddleware
+from floodguard.middleware.metrics import PrometheusMiddleware, get_metrics_response
 
 from floodguard.config import settings
 from floodguard.api.routes import router as api_router
@@ -45,7 +47,6 @@ app.add_middleware(PrometheusMiddleware)
 app.include_router(api_router)
 
 # Mount static files directory
-from fastapi.staticfiles import StaticFiles
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -54,9 +55,6 @@ if static_dir.exists():
 
 
 # ------------------ LIVE WEBSOCKET CHANNELS ------------------
-from fastapi import WebSocket, WebSocketDisconnect
-from typing import List, Dict, Any
-
 class LiveAlertConnectionManager:
     """Manages real-time bidirectional WebSocket connections for instant alert broadcasts."""
     def __init__(self):
@@ -171,8 +169,6 @@ async def flood_intelligence_3d_page():
 
 
 
-from fastapi.responses import FileResponse
-
 @app.get("/download-zip", summary="Download Complete FloodGuard Project Zip")
 async def download_project_zip():
     """Download the complete FloodGuard project as a zip file."""
@@ -189,17 +185,15 @@ async def download_project_zip():
 
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("floodguard.main:app", host="127.0.0.1", port=8000, reload=True)
-
-
 # ------------------ PROMETHEUS METRICS ENDPOINT ------------------
-from fastapi.responses import Response as FastAPIResponse
-from floodguard.middleware.metrics import get_metrics_response
 
 @app.get("/metrics", include_in_schema=False)
 async def prometheus_metrics():
     """Prometheus scrape endpoint â€” exposes FloodGuard platform metrics."""
     return get_metrics_response()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("floodguard.main:app", host="127.0.0.1", port=8000, reload=True)
 

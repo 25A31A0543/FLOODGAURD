@@ -51,7 +51,7 @@ class EarlyWarningAlertService:
                 )
             elif settings.TWILIO_ACCOUNT_SID:
                 self.twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_API_SECRET)
-        except Exception as e:
+        except Exception:
             self.twilio_client = None
 
         # 2. Initialize Firebase Admin
@@ -66,7 +66,7 @@ class EarlyWarningAlertService:
                 self.firebase_initialized = True
             elif firebase_admin._apps:
                 self.firebase_initialized = True
-        except Exception as e:
+        except Exception:
             self.firebase_initialized = False
 
     def send_twilio_sms(self, to_phone: str, message_text: str) -> Dict[str, Any]:
@@ -337,9 +337,9 @@ class EarlyWarningAlertService:
 
         # Execute channel dispatches
         sms_res = self.send_twilio_sms("+919876543210", alert.headline)
-        wa_res = self.send_twilio_whatsapp("+919876543210", f"🚨 *{alert.headline}*\n\n{alert.instruction}")
-        fcm_res = self.send_firebase_push_notification("flood_alerts", alert.headline, alert.instruction)
-        voice_res = self.make_voice_alert_call("+919876543210", f"Urgent flood warning. {alert.instruction}")
+        self.send_twilio_whatsapp("+919876543210", f"🚨 *{alert.headline}*\n\n{alert.instruction}")
+        self.send_firebase_push_notification("flood_alerts", alert.headline, alert.instruction)
+        self.make_voice_alert_call("+919876543210", f"Urgent flood warning. {alert.instruction}")
 
         receipt = AlertDispatchReceipt(
             dispatch_id=dispatch_id,
@@ -414,6 +414,7 @@ class EarlyWarningAlertService:
                 "risk_level": risk,
                 "predicted_depth_m": depth,
                 "notification_language": lang,
+                "message": msg,
                 "sms_queued": True,
                 "whatsapp_queued": bool(c.get("whatsapp_opt_in")),
                 "fcm_push_queued": bool(c.get("device_token"))

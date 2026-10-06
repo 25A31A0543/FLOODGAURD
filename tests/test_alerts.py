@@ -1,9 +1,6 @@
-import asyncio
-import pytest
 from fastapi.testclient import TestClient
 from floodguard.main import app
 from floodguard.services.alert_service import alert_service
-from floodguard.services.forecast_service import forecast_service
 
 client = TestClient(app)
 

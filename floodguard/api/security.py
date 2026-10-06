@@ -1,8 +1,7 @@
-﻿"""
+"""
 FloodGuard Step 5: Security API helpers
 OAuth2-compatible token generation and validation endpoints.
 """
-from datetime import datetime, timezone
 from fastapi import APIRouter
 
 from floodguard.middleware.auth import create_access_token, decode_access_token

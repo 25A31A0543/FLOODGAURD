@@ -1,1 +1,1 @@
-﻿# FloodGuard Middleware Package
+# FloodGuard Middleware Package
